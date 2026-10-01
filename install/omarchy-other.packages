@@ -37,7 +37,6 @@ pipewire-jack
 pipewire-libcamera
 pipewire-pulse
 qt6-wayland
-rtkit
 snapper
 sof-firmware
 thermald
