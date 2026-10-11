@@ -148,6 +148,22 @@ assert(
   'app library keeps owning an OSD a previous launch left on screen'
 )
 
+// DesktopEntries watches every ancestor of the applications dirs, $HOME
+// included, so unrelated dotfile saves re-emit an unchanged app list. The
+// rescans must run only when the entries they read actually changed.
+const valuesChangedMatch = appLibraryQml.match(/target: DesktopEntries\.applications\s*function onValuesChanged\(\) \{([\s\S]*?)\n    \}/)
+assert(valuesChangedMatch, 'app library handles DesktopEntries valuesChanged')
+const guardAt = valuesChangedMatch[1].indexOf('if (key === root.desktopAppsKey) return')
+assert(
+  guardAt >= 0 && guardAt < valuesChangedMatch[1].indexOf('hiddenEntryScan.running = true'),
+  'app library skips the hidden-entry and icon rescans when the app list is unchanged'
+)
+const keyMatch = appLibraryQml.match(/function computeDesktopAppsKey\(\) \{([\s\S]*?)\n  \}/)
+assert(
+  keyMatch && ['entry.id', 'entry.noDisplay', 'entry.icon', 'entry.name'].every((field) => keyMatch[1].includes(field)),
+  'app library keys the app list by id, NoDisplay, icon and name'
+)
+
 const openMatch = menuQml.match(/function openExistingMenu\(initialMenu\) \{([\s\S]*?)\n  \}/)
 assert(openMatch, 'menu openExistingMenu function exists')
 assert(
