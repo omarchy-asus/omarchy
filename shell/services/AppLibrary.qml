@@ -269,9 +269,31 @@ Item {
     onTriggered: root.closeLaunchFeedback(root.launchSerial)
   }
 
+  // DesktopEntries watches every ancestor of the XDG applications dirs, $HOME
+  // included, so any dotfile save there (an editor, a shell history write, an
+  // agent's atomic config rename) emits valuesChanged with the same entries.
+  // Rescan only when an entry the scans depend on was added, removed or
+  // changed; a burst of identical emissions then costs one comparison each.
+  property string desktopAppsKey: ""
+
+  function computeDesktopAppsKey() {
+    var values = DesktopEntries.applications.values || []
+    var parts = []
+    for (var i = 0; i < values.length; i++) {
+      var entry = values[i]
+      if (!entry) continue
+      parts.push([entry.id, entry.noDisplay ? "1" : "0", entry.icon || "", entry.name || ""].join("\u001f"))
+    }
+    parts.sort()
+    return parts.join("\u001e")
+  }
+
   Connections {
     target: DesktopEntries.applications
     function onValuesChanged() {
+      var key = root.computeDesktopAppsKey()
+      if (key === root.desktopAppsKey) return
+      root.desktopAppsKey = key
       hiddenEntryScan.running = true
       iconIndexDebounce.restart()
       root.appsChanged()
@@ -279,6 +301,7 @@ Item {
   }
 
   Component.onCompleted: {
+    root.desktopAppsKey = root.computeDesktopAppsKey()
     hiddenEntryScan.running = true
     iconIndexScan.running = true
   }
