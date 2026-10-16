@@ -33,10 +33,16 @@ if command -v systemd-analyze >/dev/null; then
   mkdir -p "$unit_dir/asusd.service.d"
   printf '[Service]\nType=simple\nExecStart=/usr/bin/true\n' >"$unit_dir/asusd.service"
   cp "$dropin" "$unit_dir/asusd.service.d/"
-  output=$(SYSTEMD_UNIT_PATH="$unit_dir:" systemd-analyze --user verify "$unit_dir/asusd.service" 2>&1) ||
+  # asusd is a system unit; verifying in system scope needs no running user
+  # manager, so this also runs headless and in CI.
+  if output=$(SYSTEMD_UNIT_PATH="$unit_dir:" systemd-analyze verify --man=no "$unit_dir/asusd.service" 2>&1); then
+    [[ $output != *"Unknown"* && $output != *"Invalid"* ]] || fail "the asusd drop-in parses cleanly" "$output"
+    pass "the asusd drop-in parses"
+  elif [[ $output == *"Failed to initialize manager"* || $output == *"Access denied"* ]]; then
+    printf 'ok - the asusd drop-in parses # SKIP systemd-analyze cannot run here: %s\n' "${output%%$'\n'*}"
+  else
     fail "the asusd drop-in parses" "$output"
-  [[ $output != *"Unknown"* && $output != *"Invalid"* ]] || fail "the asusd drop-in parses cleanly" "$output"
-  pass "the asusd drop-in parses"
+  fi
 fi
 
 # The migration applies the same three settings to a running asusd, only on
