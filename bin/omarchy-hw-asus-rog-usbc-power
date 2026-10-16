@@ -4,7 +4,9 @@
 
 # The firmware reports which input it charges from (WMI DSTS 0x0012006C):
 # 0 for none, bit 0 for the barrel adapter, bit 1 for a USB-C PD charger, and 3
-# when both are plugged in and it charges from the barrel. The kernel publishes
+# when both are plugged in and it charges from the barrel. Other bits can be set
+# too: a 60 W PD charger reads 18 (0x12, bit 4 as well), so only bits 0 and 1
+# are tested. The kernel publishes
 # it read-only as the asus-armoury charge_mode attribute, or as asus-nb-wmi's
 # charge_mode on kernels without asus-armoury. UPower can't tell the two apart:
 # the ACPI adapter reads online for either.
