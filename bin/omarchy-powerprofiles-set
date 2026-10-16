@@ -29,6 +29,14 @@ case "$action" in
   *) usage ;;
 esac
 
+# Restoring the remembered profile on a power-source change (no profile named)
+# is skipped when another tool manages the profile, such as a vendor power
+# daemon, so the two do not fight over every plug and unplug. A profile chosen
+# explicitly is still applied and remembered.
+if [[ -z $requested_profile ]] && omarchy-toggle-enabled powerprofiles-autoswitch-off; then
+  exit 0
+fi
+
 # An ASUS ROG laptop runs at full power only from its own barrel adapter. A
 # USB-C charger delivers far less (100 W, against 200-330 W from the
 # barrel), so there it saves power as on battery: balanced unless a profile was
