@@ -93,6 +93,13 @@ cat >"$fake_bin/socat" <<'SH'
 exec cat "$OMARCHY_TEST_EVENTS"
 SH
 
+# Logind's events are not part of this test; keep the watcher off the real bus.
+cat >"$fake_bin/gdbus" <<'SH'
+#!/bin/bash
+
+exec sleep infinity
+SH
+
 # A desktop, so the clamshell half of the watcher stays idle.
 cat >"$fake_bin/omarchy-hw-laptop" <<'SH'
 #!/bin/bash
