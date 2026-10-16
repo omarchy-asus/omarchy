@@ -2,13 +2,29 @@
 
 A public fork of [Omarchy](https://github.com/omacom/omarchy) for ASUS laptops (ROG Zephyrus, Strix and Flow, TUF, ProArt), in the style of omarchy-mac: a complete, working Omarchy for these machines, where every change is staged and proven before it is offered upstream as its own pull request. Reference machine: Zephyrus G16 GA605KM (Ryzen AI 7 350, Radeon 860M, RTX 5060 Laptop), BIOS 307.
 
-This file is the only fork-specific file at the root. Everything else follows upstream's layout so each change can be cherry-picked into a pull request unchanged.
+The fork's own files are this one, `README.md` and `fork/`. Everything else follows upstream's layout, so each fix is a pull request as it stands.
 
-## How this fork tracks upstream
+## Using it
 
-- `quattro` follows `omacom/omarchy` `quattro`; merge upstream with `git fetch upstream && git merge upstream/quattro`.
-- Each change lives on its own branch (`asus/<topic>`), one atomic commit per coherent change, then merges into `quattro` here and is opened upstream from the same branch.
-- When upstream merges a change, drop the fork's copy on the next upstream merge.
+Omarchy 4 runs from the `omarchy` package; a git checkout replaces it with `omarchy dev link`:
+
+```bash
+git clone https://github.com/rdoupe-omarchy/omarchy-asus.git ~/omarchy-asus
+omarchy dev link ~/omarchy-asus     # reboot when it asks
+```
+
+`quattro` only moves forward, so `omarchy update` keeps pulling it (`omarchy-update-dev` pulls `--ff-only`). Hardware setup and migrations run as they do upstream; every fix is gated on the hardware it is for, so on other machines the fork behaves like stock Omarchy. `omarchy dev unlink` goes back to the package. Files Omarchy installs at fixed system paths (sudoers, systemd drop-ins) come from the package build: `omarchy-dev-pkg-test` builds and installs it from the checkout.
+
+## How the fork is built
+
+- `quattro` (default branch, the one to install): upstream `quattro` merged in, then one `--no-ff` merge per fix. `git log --first-parent quattro` lists the fixes.
+- Topic branches, one per pull request, always rebased on upstream `quattro`: `asus/*` for ASUS hardware, `perf/*` for generic fixes found while profiling, `carry/*` for other people's open upstream pull requests the fork carries until they merge. `fork/branches` lists them in order, with each one's pull request draft in `fork/prs/`.
+- `asus/stack`: upstream `quattro`, one commit with the fork's own files, then every topic branch's commits in order. The whole fork as one linear series, for reading or bisecting; it is rebuilt from scratch, so do not install from it.
+- `fork/sync` does all of it: fetch upstream, rebase the topic branches, merge into `quattro`, rebuild `asus/stack`, and report branches upstream has merged so they can be dropped. `fork/sync --push` publishes.
+- A new fix: branch from `upstream/quattro`, one atomic commit per coherent change, add it to `fork/branches` with its draft in `fork/prs/`, update the README table, run `fork/sync`.
+- When upstream merges a fix, `fork/sync` reports it and the line comes out of `fork/branches`.
+
+Kernel and package changes go to the packages fork, [rdoupe-omarchy/omarchy-asus-pkgs](https://github.com/rdoupe-omarchy/omarchy-asus-pkgs), one branch per change, the same way.
 
 ## Upstream's rules this fork follows (from `AGENTS.md`, `agents/skills/`, `docs/`, `.github/`)
 

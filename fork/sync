@@ -1,0 +1,139 @@
+#!/bin/bash
+
+# Bring the fork up to date with omacom/omarchy and rebuild it from its topic branches.
+#
+#   fork/sync [--push]
+#
+# 1. Fetches upstream (omacom/omarchy) and origin.
+# 2. Rebases every branch in fork/branches onto upstream/quattro, so each one stays a clean
+#    pull request. A branch upstream has fully taken is reported and left out.
+# 3. quattro: merges upstream/quattro, then each topic branch with --no-ff. quattro only ever
+#    moves forward, so `omarchy dev link` installs (omarchy-update-dev pulls --ff-only) keep
+#    updating. `git log --first-parent quattro` lists one merge per fix.
+# 4. asus/stack: upstream/quattro, one commit with the fork's own files, then every topic
+#    branch's commits in order: the whole fork as one linear series, rebuilt from scratch.
+#
+# All of it happens in a throwaway worktree on detached commits, so branches checked out
+# elsewhere are never disturbed; a local branch is only moved when no worktree has it
+# checked out. Conflicts between topic branches are resolved once by hand; rerere replays
+# the resolution on later runs. Nothing is pushed without --push (topic branches and
+# asus/stack with --force-with-lease, quattro only as a fast-forward).
+
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+push=0
+[[ ${1:-} == --push ]] && push=1
+
+git config rerere.enabled true
+git config rerere.autoupdate true
+if ! git remote get-url upstream >/dev/null 2>&1; then
+  git remote add upstream https://github.com/omacom/omarchy.git
+fi
+git fetch --quiet upstream quattro
+git fetch --quiet origin
+
+mapfile -t branches < <(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' fork/branches | awk '{print $1}')
+fork_files=(README.md ASUS.md fork)
+
+checked_out() { git worktree list --porcelain | grep -qx "branch refs/heads/$1"; }
+# Moves a local branch to a commit unless a worktree has it checked out.
+set_branch() {
+  if checked_out "$1"; then
+    [[ $(git rev-parse "$1") == "$2" ]] || echo "  note: $1 is checked out in a worktree; its local ref was left alone (new tip ${2:0:9})"
+  else
+    git branch --quiet -f "$1" "$2"
+  fi
+}
+# A topic branch's current tip: the local branch if there is one, else origin's.
+tip_of() {
+  if git show-ref --quiet "refs/heads/$1"; then git rev-parse "refs/heads/$1"; else git rev-parse "refs/remotes/origin/$1"; fi
+}
+
+wt=$(mktemp -d)/wt
+git worktree add --quiet --detach "$wt" upstream/quattro
+cleanup() { git worktree remove --force "$wt" >/dev/null 2>&1 || true; }
+fail() { echo "fork/sync: $*" >&2; echo "fork/sync: the worktree is kept at $wt" >&2; trap - EXIT; exit 1; }
+trap cleanup EXIT
+g() { git -C "$wt" "$@"; }
+
+declare -A tip
+live=()
+for branch in "${branches[@]}"; do
+  ref=$(tip_of "$branch")
+  if ! git cherry upstream/quattro "$ref" | grep -q '^+'; then
+    echo "merged upstream: $branch (remove it from fork/branches)"
+    continue
+  fi
+  live+=("$branch")
+  if git merge-base --is-ancestor upstream/quattro "$ref"; then
+    tip[$branch]=$ref
+    echo "up to date:      $branch"
+  else
+    g checkout --quiet --detach "$ref"
+    g rebase --quiet upstream/quattro || fail "$branch does not rebase cleanly onto upstream/quattro"
+    tip[$branch]=$(g rev-parse HEAD)
+    echo "rebased:         $branch"
+  fi
+  set_branch "$branch" "${tip[$branch]}"
+done
+
+# quattro: upstream first, then every topic branch. Starts from the local quattro when it is
+# ahead of origin's (unpushed fork commits), else from origin's.
+base=origin/quattro
+if git show-ref --quiet refs/heads/quattro && git merge-base --is-ancestor origin/quattro quattro; then
+  base=quattro
+fi
+g checkout --quiet --detach "$base"
+g merge --quiet --no-edit -m "Merge upstream quattro" upstream/quattro
+for branch in "${live[@]}"; do
+  if git merge-base --is-ancestor "${tip[$branch]}" "$(g rev-parse HEAD)"; then
+    continue
+  fi
+  if ! g merge --quiet --no-ff --no-edit -m "Merge $branch" "${tip[$branch]}"; then
+    [[ -z $(g diff --name-only --diff-filter=U) ]] || fail "merging $branch into quattro conflicts; resolve it there, commit, and rerun"
+    echo "  note: $branch merged with a recorded (rerere) resolution in: $(g diff --cached --name-only | tr '\n' ' ')"
+    g commit --quiet --no-edit
+  fi
+  echo "merged into quattro: $branch"
+done
+quattro=$(g rev-parse HEAD)
+
+# asus/stack: the same content as one linear series.
+g checkout --quiet --detach upstream/quattro
+g checkout "$quattro" -- "${fork_files[@]}"
+g commit --quiet -m "Omarchy ASUS: fork documentation and tooling"
+for branch in "${live[@]}"; do
+  for commit in $(git rev-list --reverse --no-merges "upstream/quattro..${tip[$branch]}"); do
+    if ! g cherry-pick "$commit" >/dev/null 2>&1; then
+      [[ -z $(g diff --name-only --diff-filter=U) ]] || fail "stacking $branch ($commit) conflicts; resolve it there and rerun"
+      g -c core.editor=true cherry-pick --continue >/dev/null
+    fi
+  done
+done
+stack=$(g rev-parse HEAD)
+
+if ! git diff --quiet "$quattro" "$stack"; then
+  echo "fork/sync: warning: asus/stack and quattro differ:" >&2
+  git diff --stat "$quattro" "$stack" >&2
+fi
+
+# quattro moves only forward; the main checkout follows it when it is on quattro and clean.
+if [[ $(git symbolic-ref --short -q HEAD) == quattro && -z $(git status --porcelain) ]]; then
+  git merge --quiet --ff-only "$quattro"
+else
+  set_branch quattro "$quattro"
+fi
+set_branch asus/stack "$stack"
+echo "quattro ${quattro:0:9}, asus/stack ${stack:0:9}, ${#live[@]} topic branches"
+
+if (( push )); then
+  git push --quiet origin "$quattro:refs/heads/quattro"
+  for branch in "${live[@]}"; do
+    git push --quiet --force-with-lease="$branch" origin "${tip[$branch]}:refs/heads/$branch"
+  done
+  git push --quiet --force-with-lease=asus/stack origin "$stack:refs/heads/asus/stack"
+  echo "pushed"
+else
+  echo "not pushed (run fork/sync --push)"
+fi
