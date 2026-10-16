@@ -23,6 +23,8 @@ mkdir -p "${socket%/*}"
 flags_file="$XDG_CONFIG_HOME/chromium-flags.conf"
 cp "$ROOT/config/chromium-flags.conf" "$flags_file"
 echo "# A comment of the user's" >>"$flags_file"
+# Omarchy pins hybrid laptops to the iGPU, a process flag the running browser has.
+echo "--render-node-override=/dev/dri/by-path/pci-0000:65:00.0-render" >>"$flags_file"
 
 # A running browser's side of the singleton socket: take each command line and
 # acknowledge it, as Chromium does.
