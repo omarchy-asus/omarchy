@@ -325,6 +325,13 @@ cat >"$fake_bin/socat" <<'SH'
 exec cat "$OMARCHY_TEST_EVENTS"
 SH
 
+# Logind's events are not part of this test; keep the watcher off the real bus.
+cat >"$fake_bin/gdbus" <<'SH'
+#!/bin/bash
+
+exec sleep infinity
+SH
+
 for command in omarchy-hyprland-monitor-clamshell omarchy-hyprland-monitor-external-active; do
   cat >"$fake_bin/$command" <<'SH'
 #!/bin/bash
