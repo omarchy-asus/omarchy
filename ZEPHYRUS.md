@@ -25,15 +25,9 @@ This file is the only fork-specific file at the root. Everything else follows up
 - Issues on `omacom/omarchy` are for verified bugs only; ideas go to Discussions (Suggestions), support to Discord.
 - Pull requests (from recent merges): a short imperative title that names the user-visible outcome ("Keep ...", "Fix ... on ..."); a body that states the problem, the cause, the change and how it was tested. Agent-written pull requests are accepted; say so in the body.
 
-## Planned changes
+## Status of each fix
 
-| # | Change | Where it goes upstream | State |
-|---|---|---|---|
-| 1 | Hybrid GPU: stop forcing NVIDIA VA-API/GLX when NVIDIA does not drive the display | Already open upstream as omacom/omarchy#13902; test on the G16 and comment there instead of duplicating | to test |
-| 2 | Adapter-aware power profiles (barrel = full power, battery and USB-C = save), EPP/boost bundle, asusd not rewriting its config | `install/hardware/asus/` + an event-driven `omarchy-` service | to port from rog-power v2 |
-| 3 | Battery fans off: ASUS profile quiet with the AMD profile balanced (fans 0 rpm, about 0.8 W saved, clocks unchanged) | part of 2 | to port |
-| 4 | NVIDIA PR #1299 (no RTX wake on battery-level ACPI events) | omacom/omarchy-pkgs `nvidia-open-dkms`, which already carries an unmerged NVIDIA fix | after NVIDIA responds |
-| 5 | asus-armoury `nv_tgp` offsets for all models, GA605KM entry | kernel (platform-driver-x86), report first | report to draft |
+The table in [README.md](README.md) is the single list of fixes and where each one stands in this repo, upstream and in Omarchy. Update it in the same commit as any change to a fix.
 
 ## Evidence
 

@@ -1,77 +1,101 @@
-# Omarchy
+# Omarchy Zephyrus
 
-Omarchy is a beautiful, fun & agentic Linux distribution by DHH.
+[Omarchy](https://github.com/omacom/omarchy) for ASUS ROG Zephyrus laptops (G14 and G16), kept as a fork the way [omarchy-mac](https://codeberg.org/malik-na/omarchy-mac) is for Apple Silicon.
 
-Read more at [omarchy.org](https://omarchy.org).
+## Why this repo
 
-## The Omarchy Manual
+A Zephyrus is a hybrid laptop: an AMD or Intel iGPU drives the panel, an NVIDIA RTX sits behind it for games and the HDMI port, and ASUS firmware decides fans, power limits and charging. Stock Linux and stock Omarchy run on it, but several things go wrong: the RTX wakes up and burns watts for no reason, video decodes on the wrong GPU, the firmware ignores power limits Linux thinks it set, a dropped HID report makes the Super key die silently, and so on.
 
-The manual lives in [`manual/`](manual/), which is its authoritative source.
+Fixing each of those properly means a fix in a different place: the kernel, NVIDIA's driver, Hyprland, asusctl, Omarchy itself. Each of those projects moves at its own pace, and a one-off patch on someone's laptop helps nobody else. This repo is where the fixes are collected, proven on real hardware, and then sent to the project that should own them:
 
-- [Welcome to Omarchy!](manual/01-welcome-to-omarchy.md)
+- **One place to see every fix** and where it stands upstream (the table below).
+- **A complete, working Omarchy for Zephyrus laptops** in the meantime, gated on the hardware so it behaves exactly like stock Omarchy anywhere else.
+- **Upstream first.** Every change here is staged as a self-contained commit that can become its own pull request or patch. When upstream takes a fix, the copy here is dropped.
 
-**The Basics**
+Reference machine: Zephyrus G16 GA605KM (Ryzen AI 7 350, Radeon 860M, RTX 5060 Laptop, BIOS 307). Where a fix is known to apply to other models, the table says so; where it is only verified on the GA605KM, it says that too.
 
-- [Getting Started](manual/02-getting-started.md)
-- [Coming From Mac or Windows](manual/03-coming-from-mac-or-windows.md)
-- [Navigation](manual/04-navigation.md)
-- [The top bar](manual/05-the-top-bar.md)
-- [Themes](manual/06-themes.md)
-- [Hotkeys](manual/07-hotkeys.md)
-- [Unified Clipboard & History](manual/08-unified-clipboard-history.md)
-- [Reminders](manual/09-reminders.md)
-- [Notices](manual/10-notices.md)
-- [Text Extraction & Dictation](manual/11-text-extraction-dictation.md)
-- [Screenshots & Recording](manual/12-screenshots-recording.md)
-- [Toggles, idle & screensaver](manual/13-toggles-idle-screensaver.md)
-- [Omarchy CLI](manual/14-omarchy-cli.md)
+How the fork works and which Omarchy rules it follows: [ZEPHYRUS.md](ZEPHYRUS.md).
 
-**The Applications**
+## Hardware fixes and where they stand
 
-- [Terminal](manual/15-terminal.md)
-- [Neovim](manual/16-neovim.md)
-- [AI](manual/17-ai.md)
-- [Development Tools](manual/18-development-tools.md)
-- [Shell Tools](manual/19-shell-tools.md)
-- [Shell Functions](manual/20-shell-functions.md)
-- [TUIs](manual/21-tuis.md)
-- [GUIs](manual/22-guis.md)
-- [Browsers](manual/23-browsers.md)
-- [Commercial apps/services](manual/24-commercial-apps-services.md)
-- [Web Apps](manual/25-web-apps.md)
-- [Gaming](manual/26-gaming.md)
-- [Filling out PDFs](manual/27-filling-out-pdfs.md)
-- [Windows VM](manual/28-windows-vm.md)
-- [Other Packages](manual/29-other-packages.md)
+Columns:
 
-**Configuration**
+- **Scope**: `GA605KM` = verified on that model only; `Zephyrus` = G14/G16 family firmware; `hybrid` = any iGPU + NVIDIA laptop; `ASUS` = ASUS ROG/TUF laptops on the same driver; `generic` = any laptop.
+- **This repo**: `—` not here yet (it runs as a local workaround on the reference machine); `workaround` = here, but not the way upstream should do it; `proper` = here, done the Omarchy way, ready to propose.
+- **Upstream**: the project that owns the real fix and the state there.
+- **Omarchy**: the state in [omacom/omarchy](https://github.com/omacom/omarchy) or [omacom/omarchy-pkgs](https://github.com/omacom/omarchy-pkgs).
 
-- [Updates](manual/30-updates.md)
-- [Dotfiles](manual/31-dotfiles.md)
-- [Shell plugins](manual/32-shell-plugins.md)
-- [Monitors](manual/33-monitors.md)
-- [Keyboard, Mouse, Trackpad](manual/34-keyboard-mouse-trackpad.md)
-- [Networking](manual/35-networking.md)
-- [System sleep](manual/36-system-sleep.md)
-- [Hardware authentication](manual/37-hardware-authentication.md)
-- [Fonts](manual/38-fonts.md)
-- [Backgrounds](manual/39-backgrounds.md)
-- [Prompt](manual/40-prompt.md)
-- [Branding](manual/41-branding.md)
-- [Common tweaks](manual/42-common-tweaks.md)
-- [Making your own theme](manual/43-making-your-own-theme.md)
+Status as of 2026-10-15.
 
-**The Rest**
+### GPU and RTX power
 
-- [Mac support](manual/44-mac-support.md)
-- [Troubleshooting](manual/45-troubleshooting.md)
-- [FAQ](manual/46-faq.md)
-- [System snapshots](manual/47-system-snapshots.md)
-- [Security](manual/48-security.md)
-- [Omarchy on...](manual/49-omarchy-on.md)
-- [Dual Boot Install](manual/50-dual-boot-install.md)
-- [Unattended Installs](manual/51-unattended-installs.md)
+| Fix | Effect | Scope | This repo | Upstream | Omarchy |
+|---|---|---|---|---|---|
+| Don't force NVIDIA VA-API/GLX on hybrid laptops | Browser and mpv video decode on the iGPU instead of the RTX (AV1 1080p60: 0.36 s CPU vs 2.61 s software); RTX can sleep | hybrid | — | n/a | Merged on `quattro` ([#11690](https://github.com/omacom/omarchy/pull/11690)), not in a release yet; backport [#13902](https://github.com/omacom/omarchy/pull/13902) open |
+| Defer NVPCF notifications while the RTX sleeps | RTX no longer wakes for 20-25 s at +6-9 W on every 1 % battery drop (13 of 13 drops stock, 0 of 3 patched) | Zephyrus (same firmware on GA605, GA403, GU605) | — | NVIDIA [#1299](https://github.com/NVIDIA/open-gpu-kernel-modules/pull/1299) open; [our test report](https://github.com/NVIDIA/open-gpu-kernel-modules/pull/1299#issuecomment-6205310711) posted | n/a: x86 machines get the driver from Arch, not omarchy-pkgs; carried as a local DKMS patch until NVIDIA merges |
+| Hibernate powers off instead of hanging | NVIDIA driver no longer hangs on shutdown after the hibernate image is written | hybrid | — | NVIDIA [#1412](https://github.com/NVIDIA/open-gpu-kernel-modules/pull/1412) open (not ours) | n/a (same reason) |
+| Qt Multimedia hardware decode off the RTX | The bar's codec probe held a CUDA context and kept the RTX awake all session | hybrid | not needed | n/a | Resolved: the Omarchy shell no longer uses Qt Multimedia (a test enforces it) |
+| RTX held awake on AC for HDMI | HDMI plugged into a sleeping RTX races the monitor's EDID (falls back to 1024x768); RTX stays in D0 on AC, sleeps on battery | hybrid with HDMI on the dGPU | — | NVIDIA (EDID race on resume): not reported | not proposed |
+| No NVIDIA early load in the initramfs | Smaller initramfs, amdgpu early for the LUKS prompt | hybrid | — | n/a | Same idea open, not ours: [#8263](https://github.com/omacom/omarchy/pull/8263), [#10065](https://github.com/omacom/omarchy/pull/10065) |
 
-## License
+### CPU power, fans and adapters
 
-Omarchy is released under the [MIT License](https://opensource.org/licenses/MIT).
+| Fix | Effect | Scope | This repo | Upstream | Omarchy |
+|---|---|---|---|---|---|
+| asusd hands profile and EPP control to one owner | `ChangePlatformProfileOnAc/OnBattery=false`, `PlatformProfileLinkedEpp=false` so asusd stops overriding the power policy | ASUS | in progress (`zephyrus/power`) | asusctl: not reported | not proposed |
+| Power policy by adapter: barrel = full power, battery and USB-C = save | Event-driven (udev, logind), no polling; USB-C told apart from the barrel through ASUS WMI | Zephyrus (mechanism), GA605KM (values) | in progress (`zephyrus/power`) | n/a (policy). Kernel: charger-type events not exposed to userspace (idea, not written) | not proposed |
+| Battery: EPP `power` with boost on | −0.86 W, lower in 4 of 4 A/B rounds, bursts unchanged | generic (amd_pstate) | in progress (`zephyrus/power`) | n/a | not proposed |
+| Battery: fans off at idle | ASUS profile quiet with the AMD profile balanced: fans 0 rpm instead of ~2,000-3,800, median −0.79 W, clocks unchanged | Zephyrus (verified GA605KM) | in progress (`zephyrus/power`) | n/a | not proposed |
+| Undersized charger: step down, hold charge during games | On a 140 W brick the EC clamped the CPU to 735 MHz while charging; holding the charge limit at the current level removed the stutter | GA605KM | — | n/a (the EC can't see adapter wattage) | not proposed |
+| CPU power limits (SPL/SPPT/FPPT) | **Finding:** on this BIOS the firmware ignores them unless a custom fan curve is active (47.7 W before, 48.6 W after writing 25 W) | Zephyrus family A | n/a | Kernel: fan-curve test pending before the asus-armoury entry is sent | n/a |
+
+### Kernel: ASUS drivers
+
+| Fix | Effect | Scope | This repo | Upstream | Omarchy |
+|---|---|---|---|---|---|
+| hid-asus: pass the Win-lock report through | Fn+Super locks the Windows key; the keyboard then sends a lock report instead of Super, and hid-asus's lighting-echo filter (written for another keyboard, widened twice) drops it, so Super dies silently | ASUS ROG N-Key keyboards | — (local DKMS module) | linux-input: [submitted 2026-09-10](https://patchwork.kernel.org/project/linux-input/patch/20260910055303.1238743-1-ryan.doupe@gmail.com/), no replies; ping drafted | Docs PR open: [#11045](https://github.com/omacom/omarchy/pull/11045) |
+| asus-armoury: `nv_tgp` is an offset, table uses absolute watts | On 19 of 19 surveyed models (31 official BIOS images) the firmware adds the value to the base TGP; every comparable kernel table entry uses absolute watts, so the whole allowed range overshoots the firmware maximum | ASUS (AMD + Intel, RTX 40/50) | n/a | platform-driver-x86: report drafted, not sent | n/a |
+| asus-armoury: power limits for GA605KM | Exposes Dynamic Boost, thermal target and GPU offset (0-35 W) on this model | GA605KM | n/a | Patch ready; waits on the fan-curve test and the offset report | n/a |
+| asus-armoury: FA401UV missing `requires_fan_curve` | Its firmware drops CPU power-limit writes outside fan-curve mode | FA401UV | n/a | Included in the offset report | n/a |
+
+### Display
+
+| Fix | Effect | Scope | This repo | Upstream | Omarchy |
+|---|---|---|---|---|---|
+| aquamarine ≥ 0.15.1 | 0.14: OLED panel black at Hyprland start; 0.15.0: after HDMI unplug the RTX never sleeps again | Zephyrus OLED | n/a (package version) | aquamarine [#316](https://github.com/hyprwm/aquamarine/pull/316), [#410](https://github.com/hyprwm/aquamarine/pull/410) merged (not ours); 0.15.1 in Arch | Omarchy mirror still serves 0.15.0 |
+| Hyprland: windows offset after HDMI replug | Resets the render offset on reconnect | generic | — (local build) | Hyprland [#16140](https://github.com/hyprwm/Hyprland/pull/16140) merged, unreleased (not ours) | not proposed |
+| Refresh rate by power source | 240 Hz on AC, 60 Hz on battery | Zephyrus | — | n/a | not proposed |
+
+### Sleep and hibernate
+
+| Fix | Effect | Scope | This repo | Upstream | Omarchy |
+|---|---|---|---|---|---|
+| Touchpad does not wake the laptop | The ASUF1209 touchpad wakes on any touch (129k wake events in one boot, aborted a hibernate); now keyboard, lid and power button still wake | GA605KM (likely Zephyrus) | — | Kernel i2c-hid / ASUS click-only wake: not reported | not proposed |
+| `HibernateMode=shutdown` | Platform mode rolled back on a pending wake and wedged the NVIDIA driver | hybrid | — | NVIDIA: not reported | Same fix reported, not ours: [#8589](https://github.com/omacom/omarchy/issues/8589) |
+| Hibernate 20 min after suspend on battery | systemd's 60 min default let the battery die in s2idle | generic | — | n/a | Related open, not ours: [#12125](https://github.com/omacom/omarchy/pull/12125), [#13610](https://github.com/omacom/omarchy/pull/13610), [#13540](https://github.com/omacom/omarchy/pull/13540) |
+| Idle timeouts by power source, suspend after idle lock on battery | Omarchy has one idle pair and no idle suspend | generic | — | Quickshell idle monitor bug: [#8038](https://github.com/omacom/omarchy/issues/8038), [#14438](https://github.com/omacom/omarchy/issues/14438) (not ours) | not proposed |
+
+### Video decode
+
+| Fix | Effect | Scope | This repo | Upstream | Omarchy |
+|---|---|---|---|---|---|
+| mpv decode pinned to the iGPU | Render node numbers put the RTX first; pinning to the iGPU's by-path node keeps decode on VCN and the RTX asleep | hybrid | — | n/a | `hwdec=auto-safe` merged ([#15172](https://github.com/omacom/omarchy/pull/15172), not ours) doesn't pin the node; issue [#14285](https://github.com/omacom/omarchy/issues/14285) open |
+| Chrome/Chromium VA-API on the iGPU | `--render-node-override` with the iGPU's by-path node; YouTube on battery ~9 W instead of ~12 W (with other battery fixes) | hybrid | — | n/a | not proposed; related open: #13081, #12704, #13189 |
+
+### Audio
+
+| Fix | Effect | Scope | This repo | Upstream | Omarchy |
+|---|---|---|---|---|---|
+| ALC285 hardware Master at 100 % under the soft mixer | Omarchy's ASUS setup leaves 12.75 dB of hidden attenuation | ASUS ROG (ALC285) | — | n/a | Issue open: [#11046](https://github.com/omacom/omarchy/issues/11046) |
+
+### Tried and rejected
+
+Measured on battery and dropped: Wi-Fi power save (dropout risk on the MT7925), PCI runtime PM and ASPM powersupersave tweaks, `amd_pstate` dynamic EPP, the full ASUS quiet profile (caps the CPU at 2 GHz), Windows-style per-core caps, IRQ steering, a session-wide Mesa GLX default (breaks OpenGL games).
+
+## Related work by others
+
+Zephyrus panels and helpers for Omarchy: [omarchy-g14-tools](https://github.com/cashcon57/omarchy-g14-tools), [omarchy-dgpu-control](https://github.com/rawritude/omarchy-dgpu-control), [omarchy-g14-controls](https://github.com/Ayumad/omarchy-g14-controls), [omarchy-armoury](https://github.com/gdeyoung/omarchy-armoury). Open Omarchy work on these laptops: [#13082](https://github.com/omacom/omarchy/pull/13082) (G16 GU605MY backlight), [#8821](https://github.com/omacom/omarchy/pull/8821) (G14 OLED MUX), [#10592](https://github.com/omacom/omarchy/pull/10592) (nvidia-powerd), [#9236](https://github.com/omacom/omarchy/issues/9236) (G14/G16 NVIDIA power spikes).
+
+## Omarchy itself
+
+Everything else is upstream Omarchy, merged regularly from `omacom/omarchy`. The manual lives in [`manual/`](manual/); start with [Welcome to Omarchy!](manual/01-welcome-to-omarchy.md) or read more at [omarchy.org](https://omarchy.org).
