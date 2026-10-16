@@ -135,7 +135,8 @@ local started = {}
 hl = { env = function() end, on = function(event, fn) if event == "hyprland.start" then started[#started + 1] = fn end end,
   exec_cmd = function(command) io.write(command, "\n") end }
 require("default.hypr.nvidia")
-for _, fn in ipairs(started) do fn() end
+-- Other modules register start handlers too; only the commands matter here.
+for _, fn in ipairs(started) do pcall(fn) end
 LUA
 }
 machine "${g16[@]}"
