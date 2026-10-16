@@ -12,9 +12,27 @@ Fixing each of those properly means a fix in a different place: the kernel, NVID
 - **A complete, working Omarchy for these laptops** in the meantime, gated on the hardware so it behaves exactly like stock Omarchy anywhere else.
 - **Upstream first.** Every change here is staged as a self-contained commit that can become its own pull request or patch. When upstream takes a fix, the copy here is dropped.
 
-Reference machine: Zephyrus G16 GA605KM (Ryzen AI 7 350, Radeon 860M, RTX 5060 Laptop, BIOS 307). Most fixes were found on it. Where a fix is known to apply to other models, the table says so (some from a survey of 52 official ASUS BIOS images); where it is only verified on the GA605KM, it says that too.
+Reference machine: Zephyrus G16 GA605KM (Ryzen AI 7 350, Radeon 860M, RTX 5060 Laptop, BIOS 307). Most fixes were found on it. Where a fix is known to apply to other models, the table says so (some from a survey of 69 official ASUS BIOS images); where it is only verified on the GA605KM, it says that too.
 
-How the fork works and which Omarchy rules it follows: [ASUS.md](ASUS.md).
+## Install
+
+On an Omarchy 4 machine:
+
+```bash
+git clone https://github.com/rdoupe-omarchy/omarchy-asus.git ~/omarchy-asus
+omarchy dev link ~/omarchy-asus     # reboot when it asks; `omarchy dev unlink` goes back
+```
+
+`omarchy update` then follows this fork's `quattro`. Every fix is gated on the hardware it is for, so on any other machine it behaves like stock Omarchy. Kernel and NVIDIA driver fixes come as packages and are not part of this step (see the table).
+
+## How the fork is organised
+
+- `quattro`: upstream Omarchy plus every fix below, one merge per fix (`git log --first-parent`).
+- One topic branch per fix (`asus/*`, `perf/*`, `carry/*`), rebased on upstream and ready to open as its own pull request; the drafts are in [`fork/prs/`](fork/prs) and the list in [`fork/branches`](fork/branches).
+- `asus/stack`: all the fixes as one linear series of commits on top of upstream.
+- `fork/sync` rebuilds all of it after an upstream update.
+
+Details, and the Omarchy rules every change follows: [ASUS.md](ASUS.md).
 
 ## Hardware fixes and where they stand
 
