@@ -32,4 +32,6 @@ if o.shell_succeeds(o.shell_quote(nvidia)) then
       hl.env("__GLX_VENDOR_LIBRARY_NAME", "nvidia")
     end
   end
+
+  require("default.hypr.hybrid-cursor")
 end
