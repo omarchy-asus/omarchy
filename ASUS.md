@@ -1,13 +1,13 @@
-# Omarchy Zephyrus
+# Omarchy ASUS
 
-A public fork of [Omarchy](https://github.com/omacom/omarchy) for ASUS ROG Zephyrus laptops (G14, G16), in the style of omarchy-mac: a complete, working Omarchy for these machines, where every change is staged and proven before it is offered upstream as its own pull request. Reference machine: Zephyrus G16 GA605KM (Ryzen AI 7 350, Radeon 860M, RTX 5060 Laptop), BIOS 307.
+A public fork of [Omarchy](https://github.com/omacom/omarchy) for ASUS laptops (ROG Zephyrus, Strix and Flow, TUF, ProArt), in the style of omarchy-mac: a complete, working Omarchy for these machines, where every change is staged and proven before it is offered upstream as its own pull request. Reference machine: Zephyrus G16 GA605KM (Ryzen AI 7 350, Radeon 860M, RTX 5060 Laptop), BIOS 307.
 
 This file is the only fork-specific file at the root. Everything else follows upstream's layout so each change can be cherry-picked into a pull request unchanged.
 
 ## How this fork tracks upstream
 
 - `quattro` follows `omacom/omarchy` `quattro`; merge upstream with `git fetch upstream && git merge upstream/quattro`.
-- Each change lives on its own branch (`zephyrus/<topic>`), one atomic commit per coherent change, then merges into `quattro` here and is opened upstream from the same branch.
+- Each change lives on its own branch (`asus/<topic>`), one atomic commit per coherent change, then merges into `quattro` here and is opened upstream from the same branch.
 - When upstream merges a change, drop the fork's copy on the next upstream merge.
 
 ## Upstream's rules this fork follows (from `AGENTS.md`, `agents/skills/`, `docs/`, `.github/`)
