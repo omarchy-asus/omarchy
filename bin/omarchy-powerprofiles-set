@@ -27,6 +27,14 @@ case "$action" in
   *) usage ;;
 esac
 
+# An ASUS ROG Zephyrus runs at full power only from its own barrel adapter. A
+# USB-C charger delivers far less (100 W, against 200 W or more from the
+# barrel), so there it saves power as on battery: balanced unless a profile was
+# picked while on USB-C, which is remembered apart from the barrel's.
+if [[ $action == "ac" ]] && omarchy-hw-asus-rog-usbc-power; then
+  action=usb-c
+fi
+
 mapfile -t profiles < <(omarchy-powerprofiles-list)
 
 profile_available() {
