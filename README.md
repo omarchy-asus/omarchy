@@ -47,7 +47,7 @@ Status as of 2026-10-16. A branch name in **This repo** means the fix is written
 | Battery: EPP `power` with boost on | −0.86 W, lower in 4 of 4 A/B rounds, bursts unchanged | generic (amd_pstate) | — (power-profiles-daemon owns EPP and uses `balance_power`; to propose separately) | n/a | not proposed |
 | Battery: fans off at idle | ASUS profile quiet with the AMD profile balanced: fans 0 rpm instead of ~2,000-3,800, median −0.79 W, clocks unchanged | GA605KM | proper, branch `zephyrus/power` (migration and hardware check pending) | n/a | not proposed |
 | Undersized charger: step down, hold charge during games | On a 140 W brick the EC clamped the CPU to 735 MHz while charging; holding the charge limit at the current level removed the stutter | GA605KM | — | n/a (the EC can't see adapter wattage) | not proposed |
-| CPU power limits (SPL/SPPT/FPPT) | **Finding:** on this BIOS the firmware ignores them unless a custom fan curve is active (47.7 W before, 48.6 W after writing 25 W) | Zephyrus family A | n/a | Kernel: fan-curve test pending before the asus-armoury entry is sent | n/a |
+| CPU power limits (SPL/SPPT/FPPT) | **Finding, confirmed 2026-10-16:** the firmware applies them only while the custom CPU fan curve is on. With the curve on, 25 W and 40 W held exactly under full load; without it a 25 W write left the CPU at 48.5 W. Values written earlier apply the moment the curve turns on | Zephyrus family A | n/a (power policy only uses them once a branch enables the curve) | Kernel: `requires_fan_curve` confirmed for the GA605KM entry | n/a |
 
 ### Kernel: ASUS drivers
 
@@ -55,7 +55,7 @@ Status as of 2026-10-16. A branch name in **This repo** means the fix is written
 |---|---|---|---|---|---|
 | hid-asus: pass the Win-lock report through | Fn+Super locks the Windows key; the keyboard then sends a lock report instead of Super, and hid-asus's lighting-echo filter (written for another keyboard, widened twice) drops it, so Super dies silently | ASUS ROG N-Key keyboards | — (local DKMS module) | linux-input: [submitted 2026-09-10](https://patchwork.kernel.org/project/linux-input/patch/20260910055303.1238743-1-ryan.doupe@gmail.com/), no replies; ping drafted | Docs PR open: [#11045](https://github.com/omacom/omarchy/pull/11045) |
 | asus-armoury: `nv_tgp` is an offset, table uses absolute watts | On 19 of 19 surveyed models (31 official BIOS images) the firmware adds the value to the base TGP; every comparable kernel table entry uses absolute watts, so the whole allowed range overshoots the firmware maximum | ASUS (AMD + Intel, RTX 40/50) | n/a | platform-driver-x86: report drafted, not sent | n/a |
-| asus-armoury: power limits for GA605KM | Exposes Dynamic Boost, thermal target and GPU offset (0-35 W) on this model | GA605KM | n/a | Patch ready; waits on the fan-curve test and the offset report | n/a |
+| asus-armoury: power limits for GA605KM | Exposes Dynamic Boost, thermal target and GPU offset (0-35 W) on this model | GA605KM | n/a | Patch ready; fan-curve gate confirmed; waits on the `nv_tgp` offset report | n/a |
 | asus-armoury: FA401UV missing `requires_fan_curve` | Its firmware drops CPU power-limit writes outside fan-curve mode | FA401UV | n/a | Included in the offset report | n/a |
 
 ### Display
