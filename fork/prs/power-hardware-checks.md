@@ -10,7 +10,7 @@ Applies to `asus/asusd-power-profiles`, `asus/usbc-power`, `asus/ga605km-quiet-f
 
 Do this on the GA605KM, with the branch installed through a dev link, only when the user agrees to that live change and its timing. Every command below only reads.
 
-1. **charge_mode on USB-C (PR 2).** Read it on battery, on the barrel and on USB-C. It should read 0 / 1 / 2:
+1. **charge_mode on USB-C (PR 2).** Read it on battery, on the barrel and on USB-C. It should read 0 on battery, 1 on the barrel, and on USB-C a value with bit 1 set and bit 0 clear (18 on a 60 W PD charger, measured 2026-10-16):
    `cat /sys/class/firmware-attributes/asus-armoury/attributes/charge_mode/current_value`
    Check the settle time: run `udevadm monitor --udev --subsystem-match=power_supply` in one terminal, plug in USB-C, and in another run `for i in $(seq 20); do cat .../charge_mode/current_value; sleep 0.25; done`. The 2 s wait must cover the gap between ACAD online and the bit.
 2. **asusd (PR 1).** After a reboot, each of these should print `b false`:

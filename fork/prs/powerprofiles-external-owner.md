@@ -9,3 +9,5 @@ The battery service re-applies the remembered AC or battery profile on every pow
 This pull request was written with Claude Code.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+**With `asus/ga605km-quiet-fans`.** The toggle also skips that branch's on/off call on source changes, so a quiet-fans state set on battery before the toggle was set stays until the owning tool writes a profile (which resets both platform-profile handlers).

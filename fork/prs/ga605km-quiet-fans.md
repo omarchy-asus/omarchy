@@ -18,3 +18,7 @@ Packaging companion: `omarchy-settings` already installs everything under `etc/s
 This pull request was written with Claude Code.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+**Without the package.** The helper runs from `/usr/bin` with a sudoers grant, both installed by the omarchy packages. A checkout linked with `omarchy dev link` has neither until the packages are built from it (`omarchy dev pkg-test`); the helper then leaves the fans alone and says why once per boot in the journal (`journalctl -t omarchy-powerprofiles-asus-quiet-fans`).
+
+**With `powerprofiles-autoswitch-off`** (`asus/powerprofiles-external-owner`), source changes return before this code runs, so a quiet-fans state set earlier on battery is not undone on plug-in by Omarchy. The tool that then owns the profile clears it with its next profile write: any write through `/sys/firmware/acpi/platform_profile` sets both handlers.

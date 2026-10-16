@@ -23,7 +23,15 @@ git clone https://github.com/rdoupe-omarchy/omarchy-asus.git ~/omarchy-asus
 omarchy dev link ~/omarchy-asus     # reboot when it asks; `omarchy dev unlink` goes back
 ```
 
-`omarchy update` then follows this fork's `quattro`. Every fix is gated on the hardware it is for, so on any other machine it behaves like stock Omarchy. Kernel and NVIDIA driver fixes come as packages and are not part of this step (see the table).
+`omarchy dev link` covers what Omarchy runs from its checkout (`bin/`, `default/`, `shell/`, migrations). A few fixes also install files at fixed system paths: the asusd drop-in (`/etc/systemd/system/asusd.service.d/`) and the GA605KM quiet-fans helper with its sudoers grant (`/usr/bin`, `/etc/sudoers.d/`). Those come from the omarchy packages, so build them from the checkout once, and again after an update that changes them:
+
+```bash
+git clone https://github.com/rdoupe-omarchy/omarchy-asus-pkgs.git ~/omarchy-asus-pkgs
+OMARCHY_PKGBUILDS_DIR=~/omarchy-asus-pkgs/pkgbuilds omarchy dev pkg-test omarchy-settings ~/omarchy-asus
+OMARCHY_PKGBUILDS_DIR=~/omarchy-asus-pkgs/pkgbuilds omarchy dev pkg-test omarchy ~/omarchy-asus
+```
+
+Without that step those two fixes stay off (the quiet-fans helper says so in the journal); everything else works. `omarchy update` then follows this fork's `quattro`. Every fix is gated on the hardware it is for, so on any other machine it behaves like stock Omarchy. Kernel and NVIDIA driver fixes come as packages and are not part of this step (see the table).
 
 ## How the fork is organised
 

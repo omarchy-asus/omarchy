@@ -27,7 +27,7 @@ This implements option 1 of #11046. To limit it to boards confirmed safe (the sm
 - `./test/all` headless (first version of this branch; the migration change since only touches the migration and its test): 22 failing files on stock `quattro` 51bfd1dba, 24 on this branch. The two extra (`emojis-test.sh`, `hermes-remove-test.sh`) passed 3 of 3 reruns each; both suites ran at the same time, so they look load-related. None touch the changed files.
 - Hardware: the 12.75 dB figure was measured on a GA605KM (BIOS 307) on 2026-09-09 with the soft mixer on (`amixer -c 2 sget Master`: step 70 of 87, -12.75 dB); 100% read 0.00 dB. Not re-measured on this branch, because that machine currently runs without the soft-mixer drop-in.
 
-Fixes #11046
+Part of #11046: new installs get Master at 100 %; existing installs are told the one command and are never made louder by an update, so the issue stays open for them until they run it.
 
 This PR was written with Claude Code (an AI agent); I reviewed it and ran the tests.
 

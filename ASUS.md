@@ -13,7 +13,17 @@ git clone https://github.com/rdoupe-omarchy/omarchy-asus.git ~/omarchy-asus
 omarchy dev link ~/omarchy-asus     # reboot when it asks
 ```
 
-`quattro` only moves forward, so `omarchy update` keeps pulling it (`omarchy-update-dev` pulls `--ff-only`). Hardware setup and migrations run as they do upstream; every fix is gated on the hardware it is for, so on other machines the fork behaves like stock Omarchy. `omarchy dev unlink` goes back to the package. Files Omarchy installs at fixed system paths (sudoers, systemd drop-ins) come from the package build: `omarchy-dev-pkg-test` builds and installs it from the checkout.
+`quattro` only moves forward, so `omarchy update` keeps pulling it (`omarchy-update-dev` pulls `--ff-only`). Hardware setup and migrations run as they do upstream; every fix is gated on the hardware it is for, so on other machines the fork behaves like stock Omarchy. `omarchy dev unlink` goes back to the package.
+
+The link covers only what Omarchy runs out of its checkout. Files at fixed system paths come from the packages: `omarchy-settings` copies `etc/` (the asusd drop-in, the quiet-fans sudoers grant) and `omarchy` installs `bin/` into `/usr/bin` (the quiet-fans helper sudo runs). Build both from the checkout with the pkgs fork's recipes:
+
+```bash
+git clone https://github.com/rdoupe-omarchy/omarchy-asus-pkgs.git ~/omarchy-asus-pkgs
+OMARCHY_PKGBUILDS_DIR=~/omarchy-asus-pkgs/pkgbuilds omarchy dev pkg-test omarchy-settings ~/omarchy-asus
+OMARCHY_PKGBUILDS_DIR=~/omarchy-asus-pkgs/pkgbuilds omarchy dev pkg-test omarchy ~/omarchy-asus
+```
+
+Without them the asusd drop-in and quiet fans stay off; the quiet-fans helper logs that once per boot (`journalctl -t omarchy-powerprofiles-asus-quiet-fans`), and the asusd migration's one-off D-Bus write still applies until asusd's config is reset.
 
 ## How the fork is built
 

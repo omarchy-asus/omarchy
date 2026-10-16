@@ -104,3 +104,11 @@ for f in /proc/$pid/fd/* /proc/$gpu/fd/*; do t=$(readlink "$f"); [[ $t == /dev/d
 - MUX "Ultimate"/dGPU-only mode on the G16: does the firmware then set `boot_vga=1` on the RTX (so the pin correctly turns off)? Needs a check on the machine after switching modes.
 - Fresh installs: the per-user leaf only pins when `/dev/dri/by-path/pci-<iGPU>-render` exists while it runs; the migration and `omarchy-refresh-chromium` catch up later otherwise.
 - A pin goes stale if the iGPU's PCI address changes (BIOS update, eGPU). mpv then falls back to software decode; what Chromium does with a missing override node is untested.
+
+## Pins that go stale
+
+The pins name the iGPU's render node by PCI path. A MUX switch to the dGPU, an iGPU turned off in firmware or a BIOS update that moves the PCI address leaves a pin pointing at nothing, and decode would fall back to software. `nvidia.lua` checks the pins at config load (the config files and cached sysfs IDs only, no device opened) and, only when one is stale, runs `omarchy-refresh-hybrid-video` at Hyprland start: it drops by-path pins that no longer name a non-NVIDIA display device and pins again to the iGPU that is there now. Pins the user set by device number are left alone. `test/shell.d/hybrid-video-decode-test.sh` covers a moved iGPU and a machine with no iGPU.
+
+## Known limits
+
+Only mpv and the Chromium-family browsers are pinned. With `LIBVA_DRIVER_NAME` no longer forced, any other VA-API client that opens the first render node (GStreamer, ffmpeg's and `vainfo`'s defaults, some Electron apps) opens renderD128, which on the G16 is the RTX: it loads NVIDIA's VA-API driver and wakes the GPU, as it did before this change. This is not a regression, but decode does not move to the iGPU for those programs.

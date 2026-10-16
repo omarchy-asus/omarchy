@@ -21,3 +21,5 @@ On x86_64, no PipeWire thread runs with realtime scheduling. `rtkit` is listed o
 - On an ASUS ROG Zephyrus G16 (GA605KM): after installing `rtkit`, PipeWire's data loop runs `SCHED_RR` priority 20 (`ps -eLo cls,rtprio,comm | grep data-loop`); before, every PipeWire thread was `TS`.
 
 This pull request was written with Claude Code; I reviewed and tested it.
+
+**Packaging.** No omarchy-pkgs change is needed: the installer and the ISO's offline mirror read `install/omarchy-base.packages` directly (the omarchy package's `depends` hold only the packages whose removal would break the desktop), and existing installs get rtkit from the migration. The list stays alphabetical, with the reason next to the entry.

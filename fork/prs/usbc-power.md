@@ -16,3 +16,5 @@ Branch: `asus/usbc-power`
 This pull request was written with Claude Code.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+**Naming a source.** Only the current source resolves to `usb-c`: `autodetect`, or a power-source change that names `ac` with no profile. `ac <profile>` names the barrel and `usb-c <profile>` names USB-C, so each can be set from anywhere, the way the manual already describes `battery <profile>`. The power panel names the current plugged-in source with `autodetect` instead of `ac`, so a pick made there on USB-C stays with USB-C. The test covers both, and charge_mode 18 (a 60 W PD charger, measured on the GA605KM) and 17.
