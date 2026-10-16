@@ -69,6 +69,17 @@ if [[ -z ${profile:-} ]] || ! profile_available "$profile"; then
 fi
 
 powerprofilesctl set "$profile" || exit
+
+# The G16 GA605KM's fans run at idle in balanced; on battery they can stop
+# without slowing the CPU. Leaving battery or balanced undoes it.
+if omarchy-hw-match "GA605KM"; then
+  if [[ $action == "battery" && $profile == "balanced" ]]; then
+    omarchy-powerprofiles-asus-quiet-fans on || true
+  else
+    omarchy-powerprofiles-asus-quiet-fans off || true
+  fi
+fi
+
 omarchy-shell -q battery refreshPowerProfile >/dev/null 2>&1 || true
 
 if [[ -n $requested_profile ]]; then
