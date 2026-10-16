@@ -18,7 +18,6 @@ utilities="$ROOT/default/hypr/bindings/utilities.lua"
 
 grep -F 'sleep "$delay"' "$monitor_watch" >/dev/null
 grep -F 'for delay in 1 3 7; do' "$monitor_watch" >/dev/null
-grep -F 'poll_clamshell_state &' "$monitor_watch" >/dev/null
 grep -F 'flock -n 9' "$monitor_watch" >/dev/null
 grep -F 'omarchy-hyprland-monitor-clamshell' "$monitor_watch" >/dev/null
 pass "monitor watcher retries internal monitor recovery after removal"
@@ -31,10 +30,13 @@ grep -F 'sync_clamshell_after_monitor_change' "$monitor_watch" >/dev/null
 grep -F 'socat -U - "UNIX-CONNECT:$SOCKET"' "$monitor_watch" >/dev/null
 pass "monitor watcher reconciles clamshell state on startup"
 
-grep -F 'omarchy-hw-laptop && omarchy-hyprland-monitor-external-active' "$monitor_watch" >/dev/null
-grep -F 'sync_poll_state' "$monitor_watch" >/dev/null
-grep -F 'done < <(socat' "$monitor_watch" >/dev/null
-pass "clamshell poll only runs on a docked laptop, not desktops or undocked laptops"
+# Drift the lid binds miss is caught by logind's lid and resume events (see
+# monitor-watch-events-test.sh), not by a timer.
+! grep -E '^[[:space:]]*sleep 2$' "$monitor_watch" >/dev/null ||
+  fail "monitor watcher does not poll the clamshell state"
+grep -F 'PrepareForSleep (false,)' "$monitor_watch" >/dev/null
+grep -F "'LidClosed'" "$monitor_watch" >/dev/null
+pass "monitor watcher reconciles on logind lid and resume events instead of polling"
 
 # Recovery costs a reload per attempt, so it must not run on a healthy machine,
 # and only one loop may run across the events that start it.
