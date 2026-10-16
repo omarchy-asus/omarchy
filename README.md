@@ -36,7 +36,7 @@ Status as of 2026-10-16. A branch name in **This repo** means the fix is written
 | Hibernate powers off instead of hanging | NVIDIA driver no longer hangs on shutdown after the hibernate image is written | hybrid | carried locally as a patched DKMS package (610.57.04 running); rebased to 615.78.08 and built, waiting for the mirror to ship 615 | NVIDIA [#1412](https://github.com/NVIDIA/open-gpu-kernel-modules/pull/1412) open (not ours); CLA not signed yet; 4 of 4 hibernates power off and resume with it on the G16 | x86 build proposal drafted in omarchy-zephyrus-pkgs (same branch as the row above) |
 | Qt Multimedia hardware decode off the RTX | The bar's codec probe held a CUDA context and kept the RTX awake all session | hybrid | not needed | n/a | Resolved: the Omarchy shell no longer uses Qt Multimedia (a test enforces it) |
 | RTX held awake on the barrel for HDMI | HDMI plugged into a sleeping RTX races the monitor's EDID (falls back to 1024x768); RTX stays in D0 on the barrel, sleeps on battery and USB-C | GA605KM | dropped 2026-10-16 (reverted on branch `asus/hw-quirks`): not needed | NVIDIA: not reported; not reproduced 2026-10-16 (3 of 3 plugs into a sleeping RTX came up at the native mode on 610.57.04 with aquamarine 0.15.1) | not proposed |
-| No NVIDIA early load in the initramfs | Smaller initramfs, amdgpu early for the LUKS prompt | hybrid | — | n/a | Same idea open, not ours: [#8263](https://github.com/omacom/omarchy/pull/8263), [#10065](https://github.com/omacom/omarchy/pull/10065) |
+| No NVIDIA early load in the initramfs | Smaller initramfs, amdgpu early for the LUKS prompt | hybrid | carried: [#8263](https://github.com/omacom/omarchy/pull/8263) cherry-picked unchanged on branch `carry/initramfs-8263` (applies cleanly; the G16 counts as hybrid) | n/a | Same idea open, not ours: [#8263](https://github.com/omacom/omarchy/pull/8263), [#10065](https://github.com/omacom/omarchy/pull/10065) |
 | Launcher menu does not wake the RTX | The hybrid-GPU menu guard ran `lspci`, which reads PCI config space and resumes a sleeping RTX for ~17 s on every launcher open | hybrid | not needed (in `quattro`) | n/a | Merged on `quattro` ([#15039](https://github.com/omacom/omarchy/pull/15039), not ours: GPUs counted from sysfs); 4.0.4 still runs `lspci` |
 
 ### CPU power, fans and adapters
@@ -90,7 +90,7 @@ Status as of 2026-10-16. A branch name in **This repo** means the fix is written
 | Fix | Effect | Scope | This repo | Upstream | Omarchy |
 |---|---|---|---|---|---|
 | ALC285 hardware Master at 100 % under the soft mixer | Omarchy's ASUS setup leaves 12.75 dB of hidden attenuation | ASUS ROG (ALC285) | — | n/a | Issue open: [#11046](https://github.com/omacom/omarchy/issues/11046) |
-| PipeWire realtime scheduling on x86 | `rtkit` was missing, so no thread ran realtime; with it PipeWire's data loop runs RR 20. Omarchy lists `rtkit` for aarch64 only, assuming something pulls it in on x86 | generic | — (installed locally) | n/a | not proposed |
+| PipeWire realtime scheduling on x86 | `rtkit` was missing, so no thread ran realtime; with it PipeWire's data loop runs RR 20. Omarchy lists `rtkit` for aarch64 only, assuming something pulls it in on x86 | generic | proper, branch `asus/rtkit` (rtkit moved to the base list, migration) | n/a | not proposed |
 
 ### Desktop polling and latency
 
