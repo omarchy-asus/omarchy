@@ -35,7 +35,7 @@ chmod +x "$tmp_dir/bin/busctl"
 export PATH="$tmp_dir/bin:$ROOT/bin:$PATH"
 export POWERPROFILES_LOG="$tmp_dir/calls"
 export OMARCHY_POWERPROFILES_STATE_DIR="$tmp_dir/state"
-# No ASUS charge_mode here, so a Zephyrus running this on USB-C power gets the
+# No ASUS charge_mode here, so an ASUS ROG laptop running this on USB-C power gets the
 # same results as any other machine.
 export OMARCHY_SYS_ROOT="$tmp_dir/sys"
 

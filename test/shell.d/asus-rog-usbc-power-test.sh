@@ -15,7 +15,7 @@ mkdir -p "$tmp_dir/bin" "$tmp_dir/state" "$armoury" "$legacy" "$power/ACAD"
 printf 'Mains\n' >"$power/ACAD/type"
 printf '1\n' >"$power/ACAD/online"
 
-# The machine is a ROG Zephyrus unless a test says otherwise.
+# The machine is a ROG laptop unless a test says otherwise.
 cat >"$tmp_dir/bin/omarchy-hw-asus-rog" <<'EOF'
 #!/bin/bash
 [[ ${STUB_ROG:-1} == "1" ]]
@@ -76,8 +76,8 @@ pass "the older asus-nb-wmi attribute is read when asus-armoury is missing"
 
 charge_mode 2
 ! STUB_ROG=0 usbc || fail "a non-ROG ASUS machine is left alone"
-! STUB_FAMILY="ROG Strix" usbc || fail "a ROG that is not a Zephyrus is left alone"
-pass "only a ROG Zephyrus is checked"
+STUB_FAMILY="ROG Strix" usbc || fail "a ROG Strix on USB-C is detected too"
+pass "every ROG laptop is checked, not only the Zephyrus"
 
 # On battery 0 is the answer at once; with power present the firmware gets a
 # moment to report the adapter.
