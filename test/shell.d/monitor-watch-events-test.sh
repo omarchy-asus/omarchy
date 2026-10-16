@@ -171,3 +171,26 @@ done
 wait "$watch_pid" 2>/dev/null || true
 watch_pid=""
 pass "the watcher exits when the compositor's event socket closes"
+
+# A machine without a lid has nothing for logind's lid and resume events to fix,
+# so no logind monitor runs there.
+printf '#!/bin/bash\n\nexit 1\n' >"$fake_bin/omarchy-hw-laptop"
+rm -f "$events" "$gdbus_args"
+mkfifo "$events"
+PATH="$fake_bin:$PATH" \
+XDG_RUNTIME_DIR="$test_tmp" \
+HYPRLAND_INSTANCE_SIGNATURE=test \
+OMARCHY_TEST_EVENTS="$events" \
+OMARCHY_TEST_LOGIND="$logind" \
+OMARCHY_TEST_GDBUS_ARGS="$gdbus_args" \
+OMARCHY_TEST_SYNC_LOG="$sync_log" \
+  "$ROOT/bin/omarchy-hyprland-monitor-watch" >/dev/null 2>&1 &
+watch_pid=$!
+exec {events_fd}>"$events"
+sleep 0.5
+[[ ! -e $gdbus_args ]] || fail "a machine without a lid runs no logind monitor"
+exec {events_fd}>&-
+events_fd=""
+wait "$watch_pid" 2>/dev/null || true
+watch_pid=""
+pass "a machine without a lid runs no logind monitor"
