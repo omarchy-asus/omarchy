@@ -65,21 +65,36 @@ recover_modeless() {
 # Logind's lid state and its resume signal are the backstop for drift those binds
 # can miss (e.g. across suspend/resume), so reconcile on those events instead of
 # polling: a docked laptop used to run the whole clamshell sync every 2 seconds.
+# LidClosed is announced with PropertiesChanged (logind marks only Docked and
+# OnExternalPower as not emitting). If logind restarts, the monitor exits and is
+# started again.
 logind_events() {
-  exec gdbus monitor --system --dest org.freedesktop.login1 --object-path /org/freedesktop/login1 2>/dev/null
+  local monitor=""
+
+  trap '[[ -n $monitor ]] && kill "$monitor" 2>/dev/null; exit 0' TERM
+  while true; do
+    gdbus monitor --system --dest org.freedesktop.login1 --object-path /org/freedesktop/login1 2>/dev/null &
+    monitor=$!
+    wait "$monitor"
+    monitor=""
+    sleep 5
+  done
 }
 
 # Hyprland's events and logind's, in one stream. Logind's watcher goes with the
-# compositor's socket, which is what ends this loop.
+# compositor's socket, which is what ends this loop. Only a laptop has a lid to
+# drift, as before, when the backstop only ran on a docked laptop.
 events() {
-  local logind_pid
+  local logind_pid=""
 
-  logind_events &
-  logind_pid=$!
+  if omarchy-hw-laptop; then
+    logind_events &
+    logind_pid=$!
+  fi
 
   socat -U - "UNIX-CONNECT:$SOCKET"
 
-  kill "$logind_pid" 2>/dev/null
+  [[ -n $logind_pid ]] && kill "$logind_pid" 2>/dev/null
 }
 
 sync_clamshell_after_monitor_change
