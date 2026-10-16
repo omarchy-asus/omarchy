@@ -11,8 +11,9 @@ fi
 
 if [[ ! -f $rules ]]; then
   sudo install -Dm644 /dev/stdin "$rules" <<'RULES'
-# ASUS ROG Zephyrus G16 GA605KM: any touch on the ASUF1209 touchpad wakes the
-# laptop, so disarm it; see install/hardware/asus/fix-asus-ga605km-touchpad-wake.sh.
+# ASUS ROG Zephyrus G16 GA605KM: the armed ASUF1209 touchpad counts every touch
+# as a wakeup event, which can abort suspend and hibernate, so disarm it; see
+# install/hardware/asus/fix-asus-ga605km-touchpad-wake.sh.
 ACTION=="add|bind", SUBSYSTEM=="i2c", KERNEL=="i2c-ASUF1209:*", ATTR{power/wakeup}="disabled"
 RULES
 fi
