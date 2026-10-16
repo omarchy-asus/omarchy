@@ -125,8 +125,10 @@ qrencode
 qt6-imageformats
 quickshell
 ripgrep
-ruby
+# Nothing pulls rtkit in on x86_64 or aarch64, so PipeWire gets no realtime
+# scheduling without it.
 rtkit
+ruby
 sddm
 signed
 slurp
