@@ -1,6 +1,6 @@
 # Pull requests
 
-One draft per topic branch. Before opening one: squash its `fixup!` commits (`git rebase -i --autosquash upstream/quattro` on the branch, then `fork/sync --push`), check the branch on [upstream's PR list](https://github.com/omacom/omarchy/pulls) for anything newer that overlaps, and open it from the branch with the draft's title and body. Upstream wants one change per pull request and says so when a pull request was written by an agent; every draft does.
+One draft per topic branch. Opened pull requests come from a squashed copy of the topic branch, `pr/<name>` on the fork; review changes go on `pr/<name>` and, as a `fixup!`, on the topic branch. Before opening one: squash its `fixup!` commits (`git rebase -i --autosquash upstream/quattro` on the branch, then `fork/sync --push`), check the branch on [upstream's PR list](https://github.com/omacom/omarchy/pulls) for anything newer that overlaps, and open it from the branch with the draft's title and body. Upstream wants one change per pull request and says so when a pull request was written by an agent; every draft does.
 
 ## Order to open them in
 
@@ -8,20 +8,20 @@ Ready means: `fork/test` passes with no new failures against upstream, and nothi
 
 | # | Branch | Title | State |
 |---|---|---|---|
-| 1 | `asus/rtkit` | Install rtkit on x86_64 too so PipeWire gets realtime scheduling | ready; generic, smallest |
-| 2 | `asus/asusd-power-profiles` | Stop asusd from switching the power profile and EPP on ROG laptops | ready; settings verified to persist across a reboot 2026-10-16 ([power-hardware-checks](power-hardware-checks.md)) |
-| 3 | `asus/usbc-power` | Save power on USB-C chargers on ASUS ROG Zephyrus laptops | ready; USB-C, barrel and battery checked on the GA605KM 2026-10-16 |
-| 4 | `asus/powerprofiles-external-owner` | Let another power manager own the profile on plug and unplug | ready; generic |
+| 1 | `asus/rtkit` | Install rtkit on x86_64 too so PipeWire gets realtime scheduling | not opened: [#12428](https://github.com/omacom/omarchy/pull/12428) (not ours) is the same fix with portal and PipeWire restarts; drop this branch when it merges |
+| 2 | `asus/asusd-power-profiles` → [#15667](https://github.com/omacom/omarchy/pull/15667) | Stop asusd from switching the power profile and EPP on ROG laptops | ready; settings verified to persist across a reboot 2026-10-16 ([power-hardware-checks](power-hardware-checks.md)) |
+| 3 | `asus/usbc-power` → [#15668](https://github.com/omacom/omarchy/pull/15668) | Save power on USB-C chargers on ASUS ROG Zephyrus laptops | ready; USB-C, barrel and battery checked on the GA605KM 2026-10-16 |
+| 4 | `asus/powerprofiles-external-owner` → [#15669](https://github.com/omacom/omarchy/pull/15669) | Let another power manager own the profile on plug and unplug | ready; generic |
 | 5 | `asus/hybrid-video-decode` | Keep video decode on the iGPU of hybrid NVIDIA laptops | ready; refs #14285 |
 | 6 | `asus/hdmi-cursor` | Use a software cursor while a monitor on the NVIDIA GPU is plugged into a hybrid laptop | run it once inside Hyprland first (only the equivalent local config has run) |
 | 7 | `asus/audio` | Set the ASUS ROG ALC285 Master to full scale under the soft mixer | ready; part of #11046, see #7459 |
 | 8 | `asus/touchpad-wake` | Keep the touchpad from waking the ROG Zephyrus G16 GA605KM | ready; GA605KM only |
 | 9 | `asus/hibernate-mode` | Hibernate the ROG Zephyrus G16 GA605KM in shutdown mode | after the #8589 comment; one hibernate with the migration |
 | 10 | `asus/ga605km-quiet-fans` | Stop the idle fans on battery on the ROG Zephyrus G16 GA605KM | after 2; may stay in the fork if upstream prefers no new sudoers grant for one model |
-| 11 | `perf/webcam-guard-udev` | Answer the webcam menu guard from udev instead of opening cameras | ready; generic |
+| 11 | `perf/webcam-guard-udev` → [#15670](https://github.com/omacom/omarchy/pull/15670) | Answer the webcam menu guard from udev instead of opening cameras | ready; generic |
 | 12 | `perf/monitor-watch-logind` | Reconcile clamshell state on logind events instead of a 2s poll | watch one real lid close first |
 | 13 | `perf/launcher-icon-index` | Rescan the launcher icon index at most once a minute on open | ready; generic |
-| 14 | `perf/tailscale-poll` | Poll only Tailscale status while its panel is closed | ready; generic |
+| 14 | `perf/tailscale-poll` → [#15671](https://github.com/omacom/omarchy/pull/15671) | Poll only Tailscale status while its panel is closed | ready; generic |
 | — | `carry/initramfs-8263` | someone else's #8263, carried | do not open; comment on #8263 after a hibernate on the fork |
 
 Merge conflicts between them are small and known: 3, 4 and 10 touch `bin/omarchy-powerprofiles-set`; 5 and 6 touch `default/hypr/nvidia.lua` and `test/shell.d/hw-nvidia-test.sh`. Whichever lands second needs a rebase.
