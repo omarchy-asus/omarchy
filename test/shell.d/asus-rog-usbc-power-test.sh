@@ -61,6 +61,10 @@ charge_mode 1
 ! usbc || fail "the barrel adapter is not USB-C power"
 charge_mode 3
 ! usbc || fail "barrel and USB-C together charge from the barrel"
+charge_mode 18
+usbc || fail "a 60 W PD charger (18, bit 4 set as well) reads as USB-C power"
+charge_mode 17
+! usbc || fail "the barrel with bit 4 set is not USB-C power"
 pass "charge_mode tells a USB-C charger from the barrel adapter"
 
 rm "$armoury/current_value"
@@ -97,7 +101,7 @@ charge_mode 1
 pass "USB-C saves power while the barrel adapter keeps full power"
 
 charge_mode 2
-"$ROOT/bin/omarchy-powerprofiles-set" ac power-saver
+"$ROOT/bin/omarchy-powerprofiles-set" autodetect power-saver
 [[ $(<"$tmp_dir/state/usb-c") == "power-saver" ]] || fail "a profile picked on USB-C is remembered for USB-C"
 [[ ! -e $tmp_dir/state/ac ]] || fail "a profile picked on USB-C leaves the barrel's alone"
 charge_mode 1
@@ -113,3 +117,13 @@ pass "USB-C remembers its profile apart from the barrel adapter"
 STUB_ROG=0 "$ROOT/bin/omarchy-powerprofiles-set" ac
 [[ $(tail -n 1 "$POWERPROFILES_LOG") == "performance" ]] || fail "other machines keep performance on AC"
 pass "battery and other machines behave as before"
+
+charge_mode 18
+"$ROOT/bin/omarchy-powerprofiles-set" ac balanced
+[[ $(<"$tmp_dir/state/ac") == "balanced" ]] || fail "ac <profile> on USB-C sets the barrel's profile"
+[[ $(<"$tmp_dir/state/usb-c") == "power-saver" ]] || fail "ac <profile> on USB-C leaves USB-C's profile alone"
+charge_mode 1
+"$ROOT/bin/omarchy-powerprofiles-set" usb-c performance
+[[ $(<"$tmp_dir/state/usb-c") == "performance" ]] || fail "usb-c <profile> on the barrel sets USB-C's profile"
+[[ $(<"$tmp_dir/state/ac") == "balanced" ]] || fail "usb-c <profile> leaves the barrel's profile alone"
+pass "naming ac or usb-c sets that source's profile from anywhere"
