@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# omarchy:summary=Detect whether an ASUS ROG Zephyrus runs from a USB-C charger rather than its barrel adapter.
+# omarchy:summary=Detect whether an ASUS ROG laptop runs from a USB-C charger rather than its barrel adapter.
 
 # The firmware reports which input it charges from (WMI DSTS 0x0012006C):
 # 0 for none, bit 0 for the barrel adapter, bit 1 for a USB-C PD charger, and 3
@@ -25,7 +25,7 @@ for file in "${charge_mode_files[@]}"; do
 done
 
 [[ -n $charge_mode_file ]] || exit 1
-omarchy-hw-asus-rog && omarchy-hw-match "Zephyrus" || exit 1
+omarchy-hw-asus-rog || exit 1
 
 read_charge_mode() {
   local value=""
