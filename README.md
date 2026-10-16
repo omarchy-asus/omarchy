@@ -25,27 +25,27 @@ Columns:
 - **Upstream**: the project that owns the real fix and the state there.
 - **Omarchy**: the state in [omacom/omarchy](https://github.com/omacom/omarchy) or [omacom/omarchy-pkgs](https://github.com/omacom/omarchy-pkgs).
 
-Status as of 2026-10-15.
+Status as of 2026-10-16. A branch name in **This repo** means the fix is written and pushed on that branch but not yet merged here.
 
 ### GPU and RTX power
 
 | Fix | Effect | Scope | This repo | Upstream | Omarchy |
 |---|---|---|---|---|---|
-| Don't force NVIDIA VA-API/GLX on hybrid laptops | Browser and mpv video decode on the iGPU instead of the RTX (AV1 1080p60: 0.36 s CPU vs 2.61 s software); RTX can sleep | hybrid | — | n/a | Merged on `quattro` ([#11690](https://github.com/omacom/omarchy/pull/11690)), not in a release yet; backport [#13902](https://github.com/omacom/omarchy/pull/13902) open |
+| Don't force NVIDIA VA-API/GLX on hybrid laptops | Browser and mpv video decode on the iGPU instead of the RTX (AV1 1080p60: 0.36 s CPU vs 2.61 s software); RTX can sleep. Upstream's check misses iGPUs that are a non-VGA display controller (Krackan), so the G16 is still treated as NVIDIA-driven | hybrid | detection fix on branch `zephyrus/hybrid-video` (OpenGL offload decision pending) | n/a | Merged on `quattro` ([#11690](https://github.com/omacom/omarchy/pull/11690)), not in a release yet; backport [#13902](https://github.com/omacom/omarchy/pull/13902) open |
 | Defer NVPCF notifications while the RTX sleeps | RTX no longer wakes for 20-25 s at +6-9 W on every 1 % battery drop (13 of 13 drops stock, 0 of 3 patched) | Zephyrus (same firmware on GA605, GA403, GU605) | — | NVIDIA [#1299](https://github.com/NVIDIA/open-gpu-kernel-modules/pull/1299) open; [our test report](https://github.com/NVIDIA/open-gpu-kernel-modules/pull/1299#issuecomment-6205310711) posted | n/a: x86 machines get the driver from Arch, not omarchy-pkgs; carried as a local DKMS patch until NVIDIA merges |
 | Hibernate powers off instead of hanging | NVIDIA driver no longer hangs on shutdown after the hibernate image is written | hybrid | — | NVIDIA [#1412](https://github.com/NVIDIA/open-gpu-kernel-modules/pull/1412) open (not ours) | n/a (same reason) |
 | Qt Multimedia hardware decode off the RTX | The bar's codec probe held a CUDA context and kept the RTX awake all session | hybrid | not needed | n/a | Resolved: the Omarchy shell no longer uses Qt Multimedia (a test enforces it) |
-| RTX held awake on AC for HDMI | HDMI plugged into a sleeping RTX races the monitor's EDID (falls back to 1024x768); RTX stays in D0 on AC, sleeps on battery | hybrid with HDMI on the dGPU | — | NVIDIA (EDID race on resume): not reported | not proposed |
+| RTX held awake on the barrel for HDMI | HDMI plugged into a sleeping RTX races the monitor's EDID (falls back to 1024x768); RTX stays in D0 on the barrel, sleeps on battery and USB-C | GA605KM | proper, branch `zephyrus/hw-quirks` (fork-only until NVIDIA fixes the race) | NVIDIA (EDID race on resume): not reported | not proposed |
 | No NVIDIA early load in the initramfs | Smaller initramfs, amdgpu early for the LUKS prompt | hybrid | — | n/a | Same idea open, not ours: [#8263](https://github.com/omacom/omarchy/pull/8263), [#10065](https://github.com/omacom/omarchy/pull/10065) |
 
 ### CPU power, fans and adapters
 
 | Fix | Effect | Scope | This repo | Upstream | Omarchy |
 |---|---|---|---|---|---|
-| asusd hands profile and EPP control to one owner | `ChangePlatformProfileOnAc/OnBattery=false`, `PlatformProfileLinkedEpp=false` so asusd stops overriding the power policy | ASUS | in progress (`zephyrus/power`) | asusctl: not reported | not proposed |
-| Power policy by adapter: barrel = full power, battery and USB-C = save | Event-driven (udev, logind), no polling; USB-C told apart from the barrel through ASUS WMI | Zephyrus (mechanism), GA605KM (values) | in progress (`zephyrus/power`) | n/a (policy). Kernel: charger-type events not exposed to userspace (idea, not written) | not proposed |
-| Battery: EPP `power` with boost on | −0.86 W, lower in 4 of 4 A/B rounds, bursts unchanged | generic (amd_pstate) | in progress (`zephyrus/power`) | n/a | not proposed |
-| Battery: fans off at idle | ASUS profile quiet with the AMD profile balanced: fans 0 rpm instead of ~2,000-3,800, median −0.79 W, clocks unchanged | Zephyrus (verified GA605KM) | in progress (`zephyrus/power`) | n/a | not proposed |
+| asusd hands profile and EPP control to one owner | `ChangePlatformProfileOnAc/OnBattery=false`, `PlatformProfileLinkedEpp=false` so asusd stops overriding the power policy | ASUS | proper, branch `zephyrus/power` (migration and hardware check pending) | asusctl: not reported | not proposed |
+| Power policy by adapter: barrel = full power, battery and USB-C = save | Hooks Omarchy's existing power-source event, no new daemon; USB-C told apart from the barrel through the asus-armoury `charge_mode` attribute | Zephyrus | proper, branch `zephyrus/power` (migration and USB-C check pending) | n/a (policy). Kernel: charger-type events not exposed to userspace (idea, not written) | not proposed |
+| Battery: EPP `power` with boost on | −0.86 W, lower in 4 of 4 A/B rounds, bursts unchanged | generic (amd_pstate) | — (power-profiles-daemon owns EPP and uses `balance_power`; to propose separately) | n/a | not proposed |
+| Battery: fans off at idle | ASUS profile quiet with the AMD profile balanced: fans 0 rpm instead of ~2,000-3,800, median −0.79 W, clocks unchanged | GA605KM | proper, branch `zephyrus/power` (migration and hardware check pending) | n/a | not proposed |
 | Undersized charger: step down, hold charge during games | On a 140 W brick the EC clamped the CPU to 735 MHz while charging; holding the charge limit at the current level removed the stutter | GA605KM | — | n/a (the EC can't see adapter wattage) | not proposed |
 | CPU power limits (SPL/SPPT/FPPT) | **Finding:** on this BIOS the firmware ignores them unless a custom fan curve is active (47.7 W before, 48.6 W after writing 25 W) | Zephyrus family A | n/a | Kernel: fan-curve test pending before the asus-armoury entry is sent | n/a |
 
@@ -64,13 +64,13 @@ Status as of 2026-10-15.
 |---|---|---|---|---|---|
 | aquamarine ≥ 0.15.1 | 0.14: OLED panel black at Hyprland start; 0.15.0: after HDMI unplug the RTX never sleeps again | Zephyrus OLED | n/a (package version) | aquamarine [#316](https://github.com/hyprwm/aquamarine/pull/316), [#410](https://github.com/hyprwm/aquamarine/pull/410) merged (not ours); 0.15.1 in Arch | Omarchy mirror still serves 0.15.0 |
 | Hyprland: windows offset after HDMI replug | Resets the render offset on reconnect | generic | — (local build) | Hyprland [#16140](https://github.com/hyprwm/Hyprland/pull/16140) merged, unreleased (not ours) | not proposed |
-| Refresh rate by power source | 240 Hz on AC, 60 Hz on battery | Zephyrus | — | n/a | not proposed |
+| Refresh rate by power source | 240 Hz on AC, 60 Hz on battery | preference | not carried (a preference, not a hardware fix) | n/a | not proposed |
 
 ### Sleep and hibernate
 
 | Fix | Effect | Scope | This repo | Upstream | Omarchy |
 |---|---|---|---|---|---|
-| Touchpad does not wake the laptop | The ASUF1209 touchpad wakes on any touch (129k wake events in one boot, aborted a hibernate); now keyboard, lid and power button still wake | GA605KM (likely Zephyrus) | — | Kernel i2c-hid / ASUS click-only wake: not reported | not proposed |
+| Touchpad does not wake the laptop | The ASUF1209 touchpad's wakeups aborted a hibernate (129k touchpad wake events in one boot); keyboard, lid and power button still wake | GA605KM (likely Zephyrus) | proper, branch `zephyrus/hw-quirks` | Kernel linux-input (click-only wake): report drafted, needs a repro first | not proposed |
 | `HibernateMode=shutdown` | Platform mode rolled back on a pending wake and wedged the NVIDIA driver | hybrid | — | NVIDIA: not reported | Same fix reported, not ours: [#8589](https://github.com/omacom/omarchy/issues/8589) |
 | Hibernate 20 min after suspend on battery | systemd's 60 min default let the battery die in s2idle | generic | — | n/a | Related open, not ours: [#12125](https://github.com/omacom/omarchy/pull/12125), [#13610](https://github.com/omacom/omarchy/pull/13610), [#13540](https://github.com/omacom/omarchy/pull/13540) |
 | Idle timeouts by power source, suspend after idle lock on battery | Omarchy has one idle pair and no idle suspend | generic | — | Quickshell idle monitor bug: [#8038](https://github.com/omacom/omarchy/issues/8038), [#14438](https://github.com/omacom/omarchy/issues/14438) (not ours) | not proposed |
@@ -79,8 +79,8 @@ Status as of 2026-10-15.
 
 | Fix | Effect | Scope | This repo | Upstream | Omarchy |
 |---|---|---|---|---|---|
-| mpv decode pinned to the iGPU | Render node numbers put the RTX first; pinning to the iGPU's by-path node keeps decode on VCN and the RTX asleep | hybrid | — | n/a | `hwdec=auto-safe` merged ([#15172](https://github.com/omacom/omarchy/pull/15172), not ours) doesn't pin the node; issue [#14285](https://github.com/omacom/omarchy/issues/14285) open |
-| Chrome/Chromium VA-API on the iGPU | `--render-node-override` with the iGPU's by-path node; YouTube on battery ~9 W instead of ~12 W (with other battery fixes) | hybrid | — | n/a | not proposed; related open: #13081, #12704, #13189 |
+| mpv decode pinned to the iGPU | Render node numbers put the RTX first; pinning to the iGPU's by-path node keeps decode on VCN and the RTX asleep | hybrid | proper, branch `zephyrus/hybrid-video` | n/a | `hwdec=auto-safe` merged ([#15172](https://github.com/omacom/omarchy/pull/15172), not ours) doesn't pin the node; issue [#14285](https://github.com/omacom/omarchy/issues/14285) open |
+| Chrome/Chromium VA-API on the iGPU | `--render-node-override` with the iGPU's by-path node; YouTube on battery ~9 W instead of ~12 W (with other battery fixes) | hybrid | proper, branch `zephyrus/hybrid-video` | n/a | not proposed; related open: #13081, #12704, #13189 |
 
 ### Audio
 
