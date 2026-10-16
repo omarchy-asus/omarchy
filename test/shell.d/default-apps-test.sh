@@ -133,6 +133,8 @@ chmod +x "$mock_bin"/*
 export HOME="$test_home"
 export PATH="$mock_bin:$ROOT/bin:$PATH"
 export OMARCHY_PATH="$ROOT"
+# No GPUs, so the browser installers copy the default flags unchanged on any machine.
+export OMARCHY_PCI_DEVICES_PATH="$test_tmp/no-pci-devices"
 export OMARCHY_TEST_INSTALLED_DIR="$installed_dir"
 export OMARCHY_TEST_INSTALL_LOG="$install_log"
 export OMARCHY_TEST_TERMINAL_LOG="$terminal_log"
