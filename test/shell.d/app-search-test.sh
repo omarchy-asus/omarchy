@@ -164,6 +164,12 @@ assert(
   /function indexIconText\(text\) \{[\s\S]*?root\.iconIndexScannedAt = Date\.now\(\)/.test(appLibraryQml),
   'a finished icon scan records when it ran'
 )
+const debounceMatch = appLibraryQml.match(/id: iconIndexDebounce\n([\s\S]*?)\n  \}/)
+assert(
+  debounceMatch && debounceMatch[1].includes('root.iconRescanPending = true') &&
+    iconScanMatch && /onExited:[\s\S]*root\.iconRescanPending = false[\s\S]*iconIndexScan\.running = true/.test(iconScanMatch[1]),
+  'an app-list change during a scan runs one more scan when it exits, past the open throttle'
+)
 
 const openMatch = menuQml.match(/function openExistingMenu\(initialMenu\) \{([\s\S]*?)\n  \}/)
 assert(openMatch, 'menu openExistingMenu function exists')
