@@ -4,7 +4,7 @@ One draft per topic branch. Before opening one: squash its `fixup!` commits (`gi
 
 ## Order to open them in
 
-Ready means: tests pass headless with no new failures against upstream (22 of 458 files fail on both, for environment reasons), and nothing is waiting on hardware.
+Ready means: `fork/test` passes with no new failures against upstream, and nothing is waiting on hardware. On 2026-10-16 it fails 1 of 458 test files on the fork and 1 of 446 on upstream `quattro`, the same one: `i18n-test.sh`, because the 8 `style.font.cjk.*` menu keys added by #15508 are untranslated in all 49 languages (upstream data, not this fork). Run as plain `./test/all` inside a desktop session, 21 more files fail on both for session reasons that `fork/test` clears.
 
 | # | Branch | Title | State |
 |---|---|---|---|

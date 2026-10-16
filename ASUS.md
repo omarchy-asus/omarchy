@@ -47,7 +47,7 @@ Kernel and package changes go to the packages fork, [rdoupe-omarchy/omarchy-asus
 - Use the helpers: `omarchy-pkg-add`/`omarchy-pkg-drop`, `omarchy-cmd-present`/`omarchy-cmd-missing` only for optional dependencies, `omarchy-notification-send`, `$OMARCHY_PATH` (never derived from `HOME`).
 - Privilege escalation follows the "Privilege Escalation" section of `default/agents/skills/omarchy/SKILL.md`.
 - Long-running code reacts to events (udev, logind, inotify, Hyprland events), never a timer poll; the idle-spawn and budget tests in `docs/testing.md` must stay green.
-- Tests: focused tests under `test/shell.d/*-test.sh`, `./test/all` before a pull request; visual changes are verified per `agents/skills/visual-verification.md`; graphical acceptance runs only in a disposable VM.
+- Tests: focused tests under `test/shell.d/*-test.sh`, `./test/all` before a pull request (in this fork run it as `fork/test`, which isolates the tests from the desktop session; see the script); visual changes are verified per `agents/skills/visual-verification.md`; graphical acceptance runs only in a disposable VM.
 - Markdown in `docs/`, `manual/`, `plans/`: full lines, no hard wrapping. End-user docs go in `manual/`, internals in `docs/`.
 - Issues on `omacom/omarchy` are for verified bugs only; ideas go to Discussions (Suggestions), support to Discord.
 - Pull requests (from recent merges): a short imperative title that names the user-visible outcome ("Keep ...", "Fix ... on ..."); a body that states the problem, the cause, the change and how it was tested. Agent-written pull requests are accepted; say so in the body.
