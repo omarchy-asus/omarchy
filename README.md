@@ -37,6 +37,7 @@ Status as of 2026-10-16. A branch name in **This repo** means the fix is written
 | Qt Multimedia hardware decode off the RTX | The bar's codec probe held a CUDA context and kept the RTX awake all session | hybrid | not needed | n/a | Resolved: the Omarchy shell no longer uses Qt Multimedia (a test enforces it) |
 | RTX held awake on the barrel for HDMI | HDMI plugged into a sleeping RTX races the monitor's EDID (falls back to 1024x768); RTX stays in D0 on the barrel, sleeps on battery and USB-C | GA605KM | dropped 2026-10-16 (reverted on branch `zephyrus/hw-quirks`): not needed | NVIDIA: not reported; not reproduced 2026-10-16 (3 of 3 plugs into a sleeping RTX came up at the native mode on 610.57.04 with aquamarine 0.15.1) | not proposed |
 | No NVIDIA early load in the initramfs | Smaller initramfs, amdgpu early for the LUKS prompt | hybrid | — | n/a | Same idea open, not ours: [#8263](https://github.com/omacom/omarchy/pull/8263), [#10065](https://github.com/omacom/omarchy/pull/10065) |
+| Launcher menu does not wake the RTX | The hybrid-GPU menu guard ran `lspci`, which reads PCI config space and resumes a sleeping RTX for ~17 s on every launcher open | hybrid | not needed (in `quattro`) | n/a | Merged on `quattro` ([#15039](https://github.com/omacom/omarchy/pull/15039), not ours: GPUs counted from sysfs); 4.0.4 still runs `lspci` |
 
 ### CPU power, fans and adapters
 
@@ -48,6 +49,7 @@ Status as of 2026-10-16. A branch name in **This repo** means the fix is written
 | Battery: fans off at idle | ASUS profile quiet with the AMD profile balanced: fans 0 rpm instead of ~2,000-3,800, median −0.79 W, clocks unchanged | GA605KM | proper, branch `zephyrus/power` (battery check pending; on the barrel it writes nothing) | n/a | not proposed |
 | Undersized charger: step down, hold charge during games | On a 140 W brick the EC clamped the CPU to 735 MHz while charging; holding the charge limit at the current level removed the stutter | GA605KM | — | n/a (the EC can't see adapter wattage) | not proposed |
 | CPU power limits (SPL/SPPT/FPPT) | **Finding, confirmed 2026-10-16:** the firmware applies them only while the custom CPU fan curve is on. With the curve on, 25 W and 40 W held exactly under full load; without it a 25 W write left the CPU at 48.5 W. Values written earlier apply the moment the curve turns on | Zephyrus family A | n/a (power policy only uses them once a branch enables the curve) | Kernel: `requires_fan_curve` confirmed for the GA605KM entry | n/a |
+| Omarchy's power-source restore stands aside for another owner | On unplug the shell's battery service restored `performance` for 8 s while the adapter policy set the battery profile; a `powerprofiles-autoswitch-off` toggle turns source-driven restores into no-ops, explicit choices still apply | generic | proper, branch `zephyrus/power` | n/a | not proposed |
 
 ### Kernel: ASUS drivers
 
@@ -65,6 +67,7 @@ Status as of 2026-10-16. A branch name in **This repo** means the fix is written
 | aquamarine ≥ 0.15.1 | 0.14: OLED panel black at Hyprland start; 0.15.0: after HDMI unplug the RTX never sleeps again | Zephyrus OLED | n/a (package version) | aquamarine [#316](https://github.com/hyprwm/aquamarine/pull/316), [#410](https://github.com/hyprwm/aquamarine/pull/410) merged (not ours); 0.15.1 in Arch | Omarchy mirror still serves 0.15.0 |
 | Hyprland: windows offset after HDMI replug | Resets the render offset on reconnect | generic | — (local build) | Hyprland [#16140](https://github.com/hyprwm/Hyprland/pull/16140) merged, unreleased (not ours) | not proposed |
 | Refresh rate by power source | 240 Hz on AC, 60 Hz on battery | preference | not carried (a preference, not a hardware fix) | n/a | not proposed |
+| Software cursor while HDMI runs on the RTX | Every hardware-cursor update on the NVIDIA HDMI output failed ("cursor blit failed", ~230/min, 79k in one boot) and grew Hyprland's memory; a software cursor only while an HDMI output exists stopped the errors, the panel keeps its hardware cursor | hybrid | — (local Hyprland config; a workaround) | aquamarine: leak report and patch drafted, not sent | not proposed |
 
 ### Sleep and hibernate
 
@@ -87,6 +90,20 @@ Status as of 2026-10-16. A branch name in **This repo** means the fix is written
 | Fix | Effect | Scope | This repo | Upstream | Omarchy |
 |---|---|---|---|---|---|
 | ALC285 hardware Master at 100 % under the soft mixer | Omarchy's ASUS setup leaves 12.75 dB of hidden attenuation | ASUS ROG (ALC285) | — | n/a | Issue open: [#11046](https://github.com/omacom/omarchy/issues/11046) |
+| PipeWire realtime scheduling on x86 | `rtkit` was missing, so no thread ran realtime; with it PipeWire's data loop runs RR 20. Omarchy lists `rtkit` for aarch64 only, assuming something pulls it in on x86 | generic | — (installed locally) | n/a | not proposed |
+
+### Desktop polling and latency
+
+Found in a 2026-10-16 audit of what wakes the CPU on an idle Zephyrus desktop. None of these is Zephyrus-specific; they are carried here until upstream takes them.
+
+| Fix | Effect | Scope | This repo | Upstream | Omarchy |
+|---|---|---|---|---|---|
+| Monitor watch reacts to logind events, not a 2 s poll | Docked clamshell sync ran every 2 s (~6 % of a core); now one `gdbus monitor` stream (`PrepareForSleep(false)`, `LidClosed`) plus the existing socket2 events | generic | proper, branch `zephyrus/perf` | n/a | not proposed |
+| Webcam menu guard reads udev instead of opening cameras | `v4l2-ctl` opened and powered every UVC node on each menu open (8 ms); udev's `ID_V4L_CAPABILITIES` answers in 2 ms with no device opened | generic | proper, branch `zephyrus/perf` | n/a | not proposed |
+| Launcher icon index rescanned at most once a minute | Every menu open walked ~9,100 icon paths with a JS callback per line; now at most once a minute, in one pass | generic | proper, branch `zephyrus/perf` | n/a | not proposed |
+| Tailscale panel polls only `status` while closed | Three Tailscale clients every 30 s per bar; now one, the rest only while the panel is open | generic | proper, branch `zephyrus/perf` | n/a | not proposed |
+| Encrypted root with discards and no crypt workqueues | The installer's LUKS root passes no TRIM and queues I/O through kcryptd (131 GiB untrimmed, a 156 s I/O stall in 20 h on this machine); `--allow-discards --perf-no_read_workqueue --perf-no_write_workqueue` stored in the LUKS2 header | generic | — (set locally with `cryptsetup refresh --persistent`; reboot check pending) | n/a | not proposed (owned by the installer) |
+| i2c-designware RX threshold for touchpads | RX FIFO threshold 0 raises ~52 interrupts per touchpad report (1-2 % of a core while touching) | generic (AMD i2c-designware) | n/a | Kernel: patch drafted, not sent | n/a |
 
 ### Tried and rejected
 
