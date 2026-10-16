@@ -123,3 +123,38 @@ HOME="$home" bash "$ROOT/bin/omarchy-refresh-chromium" >/dev/null
 count=$(grep -cFx -- "--render-node-override=$node" "$home/.config/chromium-flags.conf" || true)
 (( count == 1 )) || fail "omarchy-refresh-chromium keeps the pin" "$(cat "$home/.config/chromium-flags.conf")"
 pass "omarchy-refresh-chromium keeps the pin"
+
+# A pin to an iGPU that is gone (a MUX switch, a BIOS update that moved its PCI
+# address) is dropped and pinned again to the iGPU that is there now; with no
+# iGPU at all the pins go. A user's own non-by-path setting stays.
+stale_check() { # prints yes when nvidia.lua would schedule a refresh at start
+  HOME="$home" lua <<'LUA'
+package.path = os.getenv("ROOT") .. "/?.lua;" .. package.path
+require("default.hypr.helpers")
+local started = {}
+hl = { env = function() end, on = function(event, fn) if event == "hyprland.start" then started[#started + 1] = fn end end,
+  exec_cmd = function(command) io.write(command, "\n") end }
+require("default.hypr.nvidia")
+for _, fn in ipairs(started) do fn() end
+LUA
+}
+machine "${g16[@]}"
+reset_home
+HOME="$home" bash -euo pipefail "$ROOT/install/user/hardware/hybrid-video-decode.sh" >/dev/null
+[[ -z $(stale_check) ]] || fail "valid pins schedule no refresh at start"
+machine 0000:64:00.0=0x10de:0x030000:0 0000:66:00.0=0x1002:0x038000
+moved="$test_tmp/by-path/pci-0000:66:00.0-render"
+[[ $(stale_check) == *omarchy-refresh-hybrid-video* ]] || fail "a pin to a gone iGPU schedules a refresh at start"
+HOME="$home" bash "$ROOT/bin/omarchy-refresh-hybrid-video"
+! grep -qF "pci-0000:65:00.0" "$home/.config/chromium-flags.conf" "$home/.config/mpv/mpv.conf" ||
+  fail "the stale pins are dropped"
+grep -qFx -- "--render-node-override=$moved" "$home/.config/chromium-flags.conf" || fail "Chromium is pinned to the iGPU's new address"
+grep -qFx -- "vaapi-device=$moved" "$home/.config/mpv/mpv.conf" || fail "mpv is pinned to the iGPU's new address"
+(( $(grep -c '^# Decode video on the integrated GPU' "$home/.config/mpv/mpv.conf") == 1 )) || fail "the mpv note is written once"
+[[ -z $(stale_check) ]] || fail "refreshed pins schedule no refresh at start"
+machine 0000:64:00.0=0x10de:0x030000:1
+printf 'vaapi-device=/dev/dri/renderD129\n' >>"$home/.config/mpv/mpv.conf"
+HOME="$home" bash "$ROOT/bin/omarchy-refresh-hybrid-video"
+! grep -qF "by-path" "$home/.config/chromium-flags.conf" "$home/.config/mpv/mpv.conf" || fail "with no iGPU the pins go"
+grep -qFx 'vaapi-device=/dev/dri/renderD129' "$home/.config/mpv/mpv.conf" || fail "a pin the user set by device number stays"
+pass "stale render node pins are dropped and re-pinned, at Hyprland start only when needed"

@@ -6,6 +6,44 @@ local nvidia_gsp = paths.omarchy_path .. "/bin/omarchy-hw-nvidia-gsp"
 local nvidia_without_gsp = paths.omarchy_path .. "/bin/omarchy-hw-nvidia-without-gsp"
 local igpu_render_node = paths.omarchy_path .. "/bin/omarchy-hw-igpu-render-node"
 
+-- Video decode pins (install/helpers/hybrid-video-decode.sh) name the iGPU's
+-- render node by PCI path. True when one names a device that is gone or is not
+-- a non-NVIDIA display device any more: a MUX switch, an iGPU turned off in
+-- firmware, a BIOS update that moved the address. Reads the config files and
+-- cached sysfs IDs only, never a device node.
+local function hybrid_video_pin_stale()
+  local home = os.getenv("HOME") or ""
+  local devices = os.getenv("OMARCHY_PCI_DEVICES_PATH") or "/sys/bus/pci/devices"
+  local function first_line(path)
+    local file = io.open(path, "r")
+    if not file then return nil end
+    local line = file:read("*l")
+    file:close()
+    return line
+  end
+  local files = { "/.config/mpv/mpv.conf", "/.config/chromium-flags.conf", "/.config/chrome-flags.conf",
+    "/.config/microsoft-edge-stable-flags.conf", "/.config/brave-flags.conf", "/.config/brave-origin-flags.conf" }
+  for _, name in ipairs(files) do
+    local file = io.open(home .. name, "r")
+    if file then
+      for line in file:lines() do
+        local address = line:match("^%s*%-%-render%-node%-override=%S*/by%-path/pci%-(.-)%-render%s*$")
+          or line:match("^%s*%-?%-?vaapi%-device%s*=%s*%S*/by%-path/pci%-(.-)%-render%s*$")
+        if address then
+          local vendor = first_line(devices .. "/" .. address .. "/vendor")
+          local class = first_line(devices .. "/" .. address .. "/class")
+          if not vendor or vendor == "0x10de" or not class or not class:match("^0x03") then
+            file:close()
+            return true
+          end
+        end
+      end
+      file:close()
+    end
+  end
+  return false
+end
+
 -- These detectors read cached sysfs IDs rather than shelling out to lspci.
 -- lspci reads PCI config space, which resumes a runtime-suspended GPU, and on a
 -- hybrid laptop that wake alone outlasts Hyprland's 1.5s config reload budget.
@@ -31,5 +69,9 @@ if o.shell_succeeds(o.shell_quote(nvidia)) then
     if nvidia_is_display then
       hl.env("__GLX_VENDOR_LIBRARY_NAME", "nvidia")
     end
+  end
+
+  if hybrid_video_pin_stale() then
+    o.exec_on_start("omarchy-refresh-hybrid-video")
   end
 end
