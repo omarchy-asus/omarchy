@@ -61,48 +61,40 @@ recover_modeless() {
   ) 9>"$MODELESS_LOCK" &
 }
 
-poll_clamshell_state() {
-  while true; do
-    sleep 2
-    sync_clamshell
-  done
+# Lid open/close itself is handled by the Hyprland "switch:*:Lid Switch" binds.
+# Logind's lid state and its resume signal are the backstop for drift those binds
+# can miss (e.g. across suspend/resume), so reconcile on those events instead of
+# polling: a docked laptop used to run the whole clamshell sync every 2 seconds.
+logind_events() {
+  exec gdbus monitor --system --dest org.freedesktop.login1 --object-path /org/freedesktop/login1 2>/dev/null
 }
 
-# The internal panel is only ever disabled while a laptop is docked (lid shut
-# with an external monitor active), so the reconciliation poll only has anything
-# to reconcile in that window. Run it while docked, stop it when undocked, and
-# never on a machine without a lid. Lid open/close itself is handled by the
-# Hyprland "switch:*:Lid Switch" binds; this poll is the recovery backstop for
-# drift those binds can miss (e.g. across suspend/resume).
-poll_pid=""
-sync_poll_state() {
-  if omarchy-hw-laptop && omarchy-hyprland-monitor-external-active; then
-    if [[ -z $poll_pid ]] || ! kill -0 "$poll_pid" 2>/dev/null; then
-      poll_clamshell_state &
-      poll_pid=$!
-    fi
-  elif [[ -n $poll_pid ]]; then
-    kill "$poll_pid" 2>/dev/null
-    poll_pid=""
-  fi
+# Hyprland's events and logind's, in one stream. Logind's watcher goes with the
+# compositor's socket, which is what ends this loop.
+events() {
+  local logind_pid
+
+  logind_events &
+  logind_pid=$!
+
+  socat -U - "UNIX-CONNECT:$SOCKET"
+
+  kill "$logind_pid" 2>/dev/null
 }
 
 sync_clamshell_after_monitor_change
-sync_poll_state
 recover_modeless
 
-# Process substitution (not a pipe) keeps this loop in the main shell, so
-# sync_poll_state can start and stop the background poll as monitors come and go.
+# Process substitution (not a pipe) keeps this loop, and the recovery jobs it
+# starts, in the main shell.
 while read -r event; do
   case "$event" in
     monitoradded\>\>*|monitoraddedv2\>\>*)
       sync_clamshell_after_monitor_change
-      sync_poll_state
       recover_modeless
       ;;
     monitorremoved\>\>*|monitorremovedv2\>\>*)
       sync_clamshell_after_monitor_change
-      sync_poll_state
       recover_modeless
       ;;
     # A reload while the monitor is unpowered leaves it at 0x0 with no hotplug
@@ -111,5 +103,10 @@ while read -r event; do
     configreloaded\>\>*)
       recover_modeless
       ;;
+    # Outputs come back from a suspend at their own pace, and a lid moved while
+    # the binds could not act leaves the panel in the wrong state.
+    *".PrepareForSleep (false,)"* | *PropertiesChanged*"'LidClosed'"*)
+      sync_clamshell_after_monitor_change
+      ;;
   esac
-done < <(socat -U - "UNIX-CONNECT:$SOCKET")
+done < <(events)
