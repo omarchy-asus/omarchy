@@ -74,4 +74,6 @@ if o.shell_succeeds(o.shell_quote(nvidia)) then
   if hybrid_video_pin_stale() then
     o.exec_on_start("omarchy-refresh-hybrid-video")
   end
+
+  require("default.hypr.hybrid-cursor")
 end

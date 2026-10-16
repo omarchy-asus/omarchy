@@ -7,7 +7,7 @@ require_command lua
 
 tmp_dir=$(mktemp -d)
 trap 'rm -rf "$tmp_dir"' EXIT
-export OMARCHY_PCI_DEVICES_PATH="$tmp_dir/devices" OMARCHY_DRI_BY_PATH="$tmp_dir/by-path" OMARCHY_PATH="$ROOT" PATH="$ROOT/bin:$PATH"
+export OMARCHY_PCI_DEVICES_PATH="$tmp_dir/devices" OMARCHY_DRI_BY_PATH="$tmp_dir/by-path" OMARCHY_DRM_PATH="$tmp_dir/drm" OMARCHY_PATH="$ROOT" PATH="$ROOT/bin:$PATH"
 # nvidia.lua reads the video decode pins in ~/.config; keep the developer's own out of the test.
 export HOME="$tmp_dir/home"
 mkdir -p "$HOME"
