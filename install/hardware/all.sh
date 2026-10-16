@@ -31,6 +31,7 @@ run_logged "$OMARCHY_INSTALL/hardware/dell-xps13-sidecar-amps.sh"
 
 run_logged "$OMARCHY_INSTALL/hardware/asus/fix-asus-ptl-display-backlight.sh"
 run_logged "$OMARCHY_INSTALL/hardware/asus/fix-asus-ptl-b9406-display.sh"
+run_logged "$OMARCHY_INSTALL/hardware/asus/fix-asus-ga605km-hibernate-mode.sh"
 run_logged "$OMARCHY_INSTALL/hardware/asus/fix-asus-ptl-b9406-touchpad.sh"
 run_logged "$OMARCHY_INSTALL/hardware/asus/fix-z13-touchpad.sh"
 run_logged "$OMARCHY_INSTALL/hardware/asus/fix-asus-proart-p14-touchpad.sh"
