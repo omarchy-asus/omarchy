@@ -32,6 +32,7 @@ Without them the asusd drop-in and quiet fans stay off; the quiet-fans helper lo
 - `asus/stack`: upstream `quattro`, one commit with the fork's own files, then every topic branch's commits in order. The whole fork as one linear series, for reading or bisecting; it is rebuilt from scratch, so do not install from it.
 - `fork/sync` does all of it: fetch upstream, rebase the topic branches, merge into `quattro`, rebuild `asus/stack`, and report branches upstream has merged so they can be dropped. `fork/sync --push` publishes.
 - A new fix: branch from `upstream/quattro`, one atomic commit per coherent change, add it to `fork/branches` with its draft in `fork/prs/`, update the README table, run `fork/sync`.
+- A change to a fix that is already merged into `quattro` goes on its topic branch as a new `fixup! <subject>` commit, never an amend, so `quattro` keeps fast-forwarding. The fixups are squashed when the pull request is opened (see `fork/prs/README.md` for the order to open them in).
 - When upstream merges a fix, `fork/sync` reports it and the line comes out of `fork/branches`.
 
 Kernel and package changes go to the packages fork, [rdoupe-omarchy/omarchy-asus-pkgs](https://github.com/rdoupe-omarchy/omarchy-asus-pkgs), one branch per change, the same way.
