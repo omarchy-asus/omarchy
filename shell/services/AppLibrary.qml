@@ -25,6 +25,9 @@ Item {
   // When the last scan finished, so an open of a consumer can skip a scan that
   // could not have found anything new yet.
   property real iconIndexScannedAt: 0
+  // An app-list change that lands while a scan runs; it may have missed the
+  // change, so one more scan runs as soon as this one exits.
+  property bool iconRescanPending: false
   readonly property int iconRefreshMinIntervalMs: 60000
 
   property int launchSerial: 0
@@ -242,6 +245,11 @@ Item {
       waitForEnd: true
       onStreamFinished: root.indexIconText(text)
     }
+    onExited: {
+      if (!root.iconRescanPending) return
+      root.iconRescanPending = false
+      iconIndexScan.running = true
+    }
   }
 
   // Coalesces bursts of app-list changes (a package install touches many
@@ -249,7 +257,10 @@ Item {
   Timer {
     id: iconIndexDebounce
     interval: 750
-    onTriggered: if (!iconIndexScan.running) iconIndexScan.running = true
+    onTriggered: {
+      if (iconIndexScan.running) root.iconRescanPending = true
+      else iconIndexScan.running = true
+    }
   }
 
   FileView {
