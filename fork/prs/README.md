@@ -9,7 +9,7 @@ Ready means: tests pass headless with no new failures against upstream (22 of 45
 | # | Branch | Title | State |
 |---|---|---|---|
 | 1 | `asus/rtkit` | Install rtkit on x86_64 too so PipeWire gets realtime scheduling | ready; generic, smallest |
-| 2 | `asus/asusd-power-profiles` | Stop asusd from switching the power profile and EPP on ROG laptops | ready after the post-reboot asusd check ([power-hardware-checks](power-hardware-checks.md)) |
+| 2 | `asus/asusd-power-profiles` | Stop asusd from switching the power profile and EPP on ROG laptops | ready; settings verified to persist across a reboot 2026-10-16 ([power-hardware-checks](power-hardware-checks.md)) |
 | 3 | `asus/usbc-power` | Save power on USB-C chargers on ASUS ROG Zephyrus laptops | ready; USB-C, barrel and battery checked on the GA605KM 2026-10-16 |
 | 4 | `asus/powerprofiles-external-owner` | Let another power manager own the profile on plug and unplug | ready; generic |
 | 5 | `asus/hybrid-video-decode` | Keep video decode on the iGPU of hybrid NVIDIA laptops | ready; refs #14285 |
