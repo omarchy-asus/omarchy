@@ -21,6 +21,11 @@ grep -Fx 'PACKAGED_PATH=/usr/bin/omarchy-powerprofiles-asus-quiet-fans' "$helper
   fail "the helper elevates the path the sudoers rule names"
 grep -F 'sudo -n "$PACKAGED_PATH" "$mode"' "$helper" >/dev/null ||
   fail "the helper takes the grant without prompting"
+# Without the packaged helper or the grant (a dev-linked checkout) the fans are
+# left alone, and the journal says why once per boot.
+grep -F 'logger -t omarchy-powerprofiles-asus-quiet-fans' "$helper" >/dev/null &&
+  grep -F 'omarchy-powerprofiles-asus-quiet-fans.skipped' "$helper" >/dev/null ||
+  fail "a missing helper or grant is logged once instead of skipped silently"
 gated=$(grep -A1 -E '^if \(\( EUID == 0 \)\); then$' "$helper" || true)
 [[ $gated == *"export PATH=/usr/local/sbin:/usr/local/bin:/usr/bin"* ]] ||
   fail "the helper pins PATH to system directories when it holds root"
