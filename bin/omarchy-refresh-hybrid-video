@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# omarchy:summary=Re-pin video decode to the iGPU of a hybrid laptop, dropping pins to a GPU that is gone
+
+source "$OMARCHY_PATH/install/helpers/hybrid-video-decode.sh"
+
+hybrid_video_refresh
