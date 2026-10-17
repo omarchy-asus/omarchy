@@ -4,13 +4,13 @@ One draft per topic branch. Opened pull requests come from a squashed copy of th
 
 ## Order to open them in
 
-Ready means: `fork/test` passes with no new failures against upstream, and nothing is waiting on hardware. On 2026-10-16 it fails 1 of 458 test files on the fork and 1 of 446 on upstream `quattro`, the same one: `i18n-test.sh`, because the 8 `style.font.cjk.*` menu keys added by #15508 are untranslated in all 49 languages (upstream data, not this fork). Run as plain `./test/all` inside a desktop session, 21 more files fail on both for session reasons that `fork/test` clears.
+Ready means: `fork/test` passes with no new failures against upstream, and nothing is waiting on hardware. Point it at a pkgs checkout with the companion (`OMARCHY_PKGS_PATH=~/Work/omarchy/omarchy-asus-pkgs-wt/settings-source-monitor`), or `config-test.sh` reports the charger-swap unit as not shipped. On 2026-10-17 against current upstream pkgs, `passwordless-grant-lifecycle-test.sh` also fails on both (upstream pkgs dropped the `pre_remove` it calls), and `input-indicator-test.sh` fails now and then in a full run but passes alone. On 2026-10-16 it fails 1 of 458 test files on the fork and 1 of 446 on upstream `quattro`, the same one: `i18n-test.sh`, because the 8 `style.font.cjk.*` menu keys added by #15508 are untranslated in all 49 languages (upstream data, not this fork). Run as plain `./test/all` inside a desktop session, 21 more files fail on both for session reasons that `fork/test` clears.
 
 | # | Branch | Title | State |
 |---|---|---|---|
 | 1 | `asus/rtkit` | Install rtkit on x86_64 too so PipeWire gets realtime scheduling | not opened: [#12428](https://github.com/omacom/omarchy/pull/12428) (not ours) is the same fix with portal and PipeWire restarts; drop this branch when it merges |
 | 2 | `asus/asusd-power-profiles` → [#15667](https://github.com/omacom/omarchy/pull/15667) | Stop asusd from switching the power profile and EPP on ROG laptops | ready; settings verified to persist across a reboot 2026-10-16 ([power-hardware-checks](power-hardware-checks.md)) |
-| 3 | `asus/usbc-power` → [#15668](https://github.com/omacom/omarchy/pull/15668) | Save power on USB-C chargers on ASUS ROG Zephyrus laptops | ready; USB-C, barrel and battery checked on the GA605KM 2026-10-16 |
+| 3 | `asus/usbc-power` → [#15668](https://github.com/omacom/omarchy/pull/15668) | Save power on USB-C chargers on ASUS ROG laptops | open; needs the `omarchy-settings-source-monitor` pkgs companion (branch pushed, PR not opened yet); USB-C, barrel and battery checked on the GA605KM 2026-10-16, a live charger swap not yet |
 | 4 | `asus/powerprofiles-external-owner` → [#15669](https://github.com/omacom/omarchy/pull/15669) | Let another power manager own the profile on plug and unplug | ready; generic |
 | 5 | `asus/hybrid-video-decode` | Keep video decode on the iGPU of hybrid NVIDIA laptops | ready; refs #14285 |
 | 6 | `asus/hdmi-cursor` | Use a software cursor while a monitor on the NVIDIA GPU is plugged into a hybrid laptop | run it once inside Hyprland first (only the equivalent local config has run) |
