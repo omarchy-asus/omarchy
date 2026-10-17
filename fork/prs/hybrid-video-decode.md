@@ -43,6 +43,8 @@ Making `omarchy-hw-nvidia-display` answer "iGPU" on Krackan would also drop `__G
 
 Machines without an NVIDIA GPU, NVIDIA-only machines and hybrids where NVIDIA drives the display get no change. No machine gets a different GLX vendor than it has today.
 
+Overlap: #15293 (not ours, open) fixes the display-GPU check for class 0x0380 iGPUs, the reason the comment in `nvidia.lua` gives for NVIDIA's VA-API being chosen on Krackan. With it, the G16 undocked no longer gets the NVIDIA env at all; docked over HDMI (port wired to the dGPU) both GPUs claim and it still does, so the `omarchy-hw-igpu-render-node` guard here still matters. If #15293 lands first, reword that comment to the docked case. `test/shell.d/hw-nvidia-test.sh` conflicts textually with it (both add rows); whichever lands second rebases. Draft G16 review comment for #15293: `~/Work/g16reverse/upstream/reports/12-omarchy-15293-display-gpu.md`.
+
 Not covered: #14285 also reports mpv's Vulkan device enumeration (`vo=gpu-next`) resuming the dGPU on an Intel + RTX 5070 machine. This PR fixes the decode path; if enumeration still wakes the card there, `VK_LOADER_DRIVERS_DISABLE` scoped to mpv is the follow-up that issue suggests.
 
 ## Evidence (G16 GA605KM, nvidia-open 610.57.04, mesa 26.2.2, mpv 0.41.0)

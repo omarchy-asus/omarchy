@@ -6,6 +6,8 @@ Opening the menu walked every icon theme with find (about 9,000 paths, 75 ms) an
 
 An app-list change whose debounce fires while a scan runs is not dropped: one more scan runs when that scan exits, and the open throttle does not hold it back, so a newly installed app gets its icon at once.
 
+**Overlap.** #14992 (not ours) edits the same file and is complementary: it skips `valuesChanged` emissions that repeat the same apps, while this throttles the rescan on open and indexes a scan in one pass. The two merge without conflict (checked 2026-10-17).
+
 **How tested.** The focused shell tests for the touched code pass headless; `./test/all` shows no new failures against stock `quattro`.
 
 This pull request was written with Claude Code.
