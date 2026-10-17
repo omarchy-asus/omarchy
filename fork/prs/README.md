@@ -31,4 +31,5 @@ Merge conflicts between them are small and known: 3, 4 and 10 touch `bin/omarchy
 | Branch | Title | State |
 |---|---|---|
 | `nvidia-open-x86_64` | nvidia-open-dkms: build for x86_64 too, with NVIDIA PRs #1299 and #1412 | after 615 has run on the GA605KM ([draft](pkgs-nvidia-open-x86_64.md)) |
+| `omarchy-settings-source-monitor` | omarchy-settings: ship the ASUS charger-swap monitor as a user unit | companion to [#15668](https://github.com/omacom/omarchy/pull/15668); ready, open it with or after #15668 ([draft](pkgs-omarchy-settings-source-monitor.md)) |
 | `linux-omarchy-hid-asus-winlock` | Add hid-asus Win-lock pass-through to the base, BORE and MuQSS kernels | after Jiri's review of the hid-asus patch, or two weeks after the ping ([draft](pkgs-linux-omarchy-hid-asus-winlock.md)) |

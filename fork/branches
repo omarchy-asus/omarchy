@@ -9,6 +9,7 @@
 # Package and kernel changes live in rdoupe-omarchy/omarchy-asus-pkgs (drafts here as fork/prs/pkgs-*.md):
 #   nvidia-open-x86_64               NVIDIA #1299, #1412 and #1368 for x86_64 nvidia-open-dkms
 #   linux-omarchy-hid-asus-winlock   hid-asus Win-lock pass-through in linux-omarchy
+#   omarchy-settings-source-monitor  ship the charger-swap monitor unit (companion to asus/usbc-power)
 
 # Power and adapters (ASUS)
 asus/asusd-power-profiles        pr  asusd-power-profiles.md
