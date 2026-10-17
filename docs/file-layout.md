@@ -212,6 +212,10 @@ upgrade. This is documented in the PKGBUILD.
 
 Arch's systemd package hook reloads units when the vendor drop-in is installed or upgraded. The settings package containing the drop-in must ship alongside the runtime package that removes the old configuration helper and migration. Pacman removes those retired files; no new state migration is needed. A running indexer finishes with its original options, and subsequent service starts use the drop-in. For an immediate local test after installing the packages, restart `plocate-updatedb.service` while connected to AC power.
 
+## NVIDIA Dynamic Boost start limit
+
+`default/systemd/system/nvidia-powerd.service.d/10-omarchy.conf` ships through `omarchy-settings` to `/usr/lib/systemd/system/nvidia-powerd.service.d/10-omarchy.conf`. nvidia-utils gives `nvidia-powerd.service` five starts with an unlimited window, meant to stop a crash loop. asusd starts the service on every charger plug-in and stops it on every unplug, so from the sixth plug-in of a boot the start is refused (`start-limit-hit`) and Dynamic Boost stays off until reboot. The drop-in sets a 60-second window: five crash restarts 10 seconds apart still trip it, and plug-ins minutes apart no longer count against it. It changes nothing on machines without nvidia-powerd, and nothing about when the service runs.
+
 ## Env bootstrap (`default/bash/env-bootstrap`)
 
 Single source of truth for `OMARCHY_PATH` and dev-link-aware `PATH`. It:
