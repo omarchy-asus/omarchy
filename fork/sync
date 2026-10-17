@@ -37,10 +37,20 @@ mapfile -t branches < <(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' fork/branches | 
 fork_files=(README.md ASUS.md fork)
 
 checked_out() { git worktree list --porcelain | grep -qx "branch refs/heads/$1"; }
-# Moves a local branch to a commit unless a worktree has it checked out.
+# Moves a local branch to a commit. A branch checked out in a clean worktree moves
+# there too; one with uncommitted changes is left alone. Leaving a rebased branch
+# behind would make the next run rebase it again into new commits, and quattro would
+# merge every topic a second time.
 set_branch() {
+  local where
+  [[ $(git rev-parse "$1") == "$2" ]] && return
   if checked_out "$1"; then
-    [[ $(git rev-parse "$1") == "$2" ]] || echo "  note: $1 is checked out in a worktree; its local ref was left alone (new tip ${2:0:9})"
+    where=$(git worktree list --porcelain | awk -v r="branch refs/heads/$1" '/^worktree /{w=substr($0, 10)} $0==r{print w}')
+    if [[ -z $(git -C "$where" status --porcelain) ]]; then
+      git -C "$where" reset --quiet --keep "$2"
+    else
+      echo "  note: $1 has uncommitted changes in $where; its local ref was left alone (new tip ${2:0:9})"
+    fi
   else
     git branch --quiet -f "$1" "$2"
   fi
