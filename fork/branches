@@ -10,6 +10,8 @@
 #   nvidia-open-x86_64               NVIDIA #1299, #1412 and #1368 for x86_64 nvidia-open-dkms
 #   linux-omarchy-hid-asus-winlock   hid-asus Win-lock pass-through in linux-omarchy
 #   omarchy-settings-source-monitor  ship the charger-swap monitor unit (companion to asus/usbc-power)
+#   omarchy-settings-nvidia-powerd   ship the nvidia-powerd start-limit drop-in (companion to asus/nvidia-powerd-start-limit)
+#   omarchy-asus                     upstream master with every companion above merged in; install and test from this one
 
 # Power and adapters (ASUS)
 asus/asusd-power-profiles        pr  asusd-power-profiles.md
@@ -21,6 +23,7 @@ asus/powerprofiles-external-owner pr powerprofiles-external-owner.md
 asus/hybrid-video-decode         pr  hybrid-video-decode.md
 asus/hdmi-cursor                 pr  hdmi-cursor.md
 carry/initramfs-8263             carry initramfs-8263.md
+asus/nvidia-powerd-start-limit   pr  nvidia-powerd-start-limit.md
 
 # Audio
 asus/audio                       pr  audio.md

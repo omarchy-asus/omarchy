@@ -23,15 +23,15 @@ git clone https://github.com/rdoupe-omarchy/omarchy-asus.git ~/omarchy-asus
 omarchy dev link ~/omarchy-asus     # reboot when it asks; `omarchy dev unlink` goes back
 ```
 
-`omarchy dev link` covers what Omarchy runs from its checkout (`bin/`, `default/`, `shell/`, migrations). A few fixes also install files at fixed system paths: the asusd drop-in (`/etc/systemd/system/asusd.service.d/`), the charger-swap monitor's user unit (`/usr/lib/systemd/user/`) and the GA605KM quiet-fans helper with its sudoers grant (`/usr/bin`, `/etc/sudoers.d/`). Those come from the omarchy packages, so build them from the checkout once, and again after an update that changes them:
+`omarchy dev link` covers what Omarchy runs from its checkout (`bin/`, `default/`, `shell/`, migrations). A few fixes also install files at fixed system paths: the asusd drop-in (`/etc/systemd/system/asusd.service.d/`), the charger-swap monitor's user unit (`/usr/lib/systemd/user/`), the nvidia-powerd start-limit drop-in (`/usr/lib/systemd/system/nvidia-powerd.service.d/`) and the GA605KM quiet-fans helper with its sudoers grant (`/usr/bin`, `/etc/sudoers.d/`). Those come from the omarchy packages, so build them from the checkout once, and again after an update that changes them:
 
 ```bash
-git clone -b omarchy-settings-source-monitor https://github.com/rdoupe-omarchy/omarchy-asus-pkgs.git ~/omarchy-asus-pkgs
+git clone -b omarchy-asus https://github.com/rdoupe-omarchy/omarchy-asus-pkgs.git ~/omarchy-asus-pkgs
 OMARCHY_PKGBUILDS_DIR=~/omarchy-asus-pkgs/pkgbuilds omarchy dev pkg-test omarchy-settings ~/omarchy-asus
 OMARCHY_PKGBUILDS_DIR=~/omarchy-asus-pkgs/pkgbuilds omarchy dev pkg-test omarchy ~/omarchy-asus
 ```
 
-The `omarchy-settings-source-monitor` branch is current upstream omarchy-pkgs plus the line that ships the monitor's unit. Without that step those fixes stay off (the quiet-fans helper says so in the journal); everything else works. `omarchy update` then follows this fork's `quattro`. Every fix is gated on the hardware it is for, so on any other machine it behaves like stock Omarchy. Kernel and NVIDIA driver fixes come as packages and are not part of this step (see the table).
+The `omarchy-asus` branch is current upstream omarchy-pkgs with every companion branch below merged in (the lines that ship the monitor's unit and the nvidia-powerd drop-in). Without that step those fixes stay off (the quiet-fans helper says so in the journal); everything else works. `omarchy update` then follows this fork's `quattro`. Every fix is gated on the hardware it is for, so on any other machine it behaves like stock Omarchy. Kernel and NVIDIA driver fixes come as packages and are not part of this step (see the table).
 
 ## How the fork is organised
 
@@ -70,6 +70,7 @@ Status as of 2026-10-16. A branch name in **This repo** is the fix's topic branc
 | Fix | Effect | Scope | This repo | Upstream | Omarchy |
 |---|---|---|---|---|---|
 | asusd hands profile and EPP control to one owner | `ChangePlatformProfileOnAc/OnBattery=false`, `PlatformProfileLinkedEpp=false` so asusd stops overriding the power policy | ASUS | proper, branch `asus/asusd-power-profiles` with migration (post-reboot check pending) | asusctl: not reported | [#15667](https://github.com/omacom/omarchy/pull/15667) open |
+| Dynamic Boost survives a day of charger plug-ins | nvidia-utils allows nvidia-powerd five starts per boot; asusd starts it on every plug-in, so from the sixth Dynamic Boost stays off until reboot (hit on the G16 2026-10-17). A drop-in gives the limit a 60 s window | ASUS | proper, branch `asus/nvidia-powerd-start-limit` with pkgs companion `omarchy-settings-nvidia-powerd` | nvidia-utils / asusctl: not reported | not opened |
 | Power policy by adapter: barrel = full power, battery and USB-C = save | Hooks Omarchy's existing power-source event, no new daemon; USB-C told apart from the barrel through the asus-armoury `charge_mode` attribute | Zephyrus | proper, branch `asus/usbc-power`; barrel checked 2026-10-16 (charge_mode 1 → performance, full power); USB-C and battery checks pending | n/a (policy). Kernel: charger-type events not exposed to userspace (idea, not written) | [#15668](https://github.com/omacom/omarchy/pull/15668) open (gate widened to all ROG laptops) |
 | Battery: EPP `power` with boost on | −0.86 W, lower in 4 of 4 A/B rounds, bursts unchanged | generic (amd_pstate) | — (power-profiles-daemon owns EPP and uses `balance_power`; to propose separately) | n/a | not proposed |
 | Battery: fans off at idle | ASUS profile quiet with the AMD profile balanced: fans 0 rpm instead of ~2,000-3,800, median −0.79 W, clocks unchanged | GA605KM | proper, branch `asus/ga605km-quiet-fans` (battery check pending; on the barrel it writes nothing) | n/a | not proposed |
