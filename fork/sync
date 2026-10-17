@@ -60,6 +60,15 @@ tip_of() {
   if git show-ref --quiet "refs/heads/$1"; then git rev-parse "refs/heads/$1"; else git rev-parse "refs/remotes/origin/$1"; fi
 }
 
+# The patch a topic adds over upstream, as a stable id.
+topic_patch() { git diff "$(git merge-base "$1" upstream/quattro)" "$1" | git patch-id --stable | cut -d' ' -f1; }
+# The same for the version of a topic that quattro (at $2) last merged, if any.
+merged_patch() {
+  local merge
+  merge=$(git log --first-parent --format=%H -1 -E --grep="^Merge $1( \(rebased, same patch\))?\$" "$2")
+  [[ -n $merge ]] && topic_patch "$(git rev-parse "$merge^2")"
+}
+
 wt=$(mktemp -d)/wt
 git worktree add --quiet --detach "$wt" upstream/quattro
 cleanup() { git worktree remove --force "$wt" >/dev/null 2>&1 || true; }
@@ -98,6 +107,14 @@ g checkout --quiet --detach "$base"
 g merge --quiet --no-edit -m "Merge upstream quattro" upstream/quattro
 for branch in "${live[@]}"; do
   if git merge-base --is-ancestor "${tip[$branch]}" "$(g rev-parse HEAD)"; then
+    continue
+  fi
+  # After upstream moves, every topic is rebased into new commits. When the patch is
+  # the same as the version quattro last merged, merging it again would only replay
+  # hunks quattro already has (and can duplicate them); record the new tip instead.
+  if [[ $(topic_patch "${tip[$branch]}") == "$(merged_patch "$branch" "$(g rev-parse HEAD)")" ]]; then
+    g merge --quiet -s ours --no-edit -m "Merge $branch (rebased, same patch)" "${tip[$branch]}"
+    echo "rebased only:    $branch"
     continue
   fi
   if ! g merge --quiet --no-ff --no-edit -m "Merge $branch" "${tip[$branch]}"; then
