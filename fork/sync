@@ -113,9 +113,11 @@ for branch in "${live[@]}"; do
 done
 stack=$(g rev-parse HEAD)
 
+# Both are built from the same topics, so any difference is a bad merge resolution
+# (a dropped change or a duplicated hunk). Stop before moving or pushing anything.
 if ! git diff --quiet "$quattro" "$stack"; then
-  echo "fork/sync: warning: asus/stack and quattro differ:" >&2
   git diff --stat "$quattro" "$stack" >&2
+  fail "asus/stack and quattro differ (above); fix the merge in quattro ($quattro) and rerun"
 fi
 
 # quattro moves only forward; the main checkout follows it when it is on quattro and clean.
