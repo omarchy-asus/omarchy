@@ -12,6 +12,8 @@ You can see what your machine offers with `omarchy powerprofiles list`, and set 
 
 If another tool manages power profiles for you, such as a vendor power daemon, stop Omarchy from switching on plug and unplug with `mkdir -p ~/.local/state/omarchy/toggles && touch ~/.local/state/omarchy/toggles/powerprofiles-autoswitch-off`. Profiles you pick yourself still apply; remove the file to switch automatically again.
 
+If another tool manages power profiles for you, such as a vendor power daemon, stop Omarchy from switching on plug and unplug with `mkdir -p ~/.local/state/omarchy/toggles && touch ~/.local/state/omarchy/toggles/powerprofiles-autoswitch-off`. Profiles you pick yourself still apply; remove the file to switch automatically again.
+
 ### Toggle suspend
 
 You toggle suspend by running `omarchy toggle suspend` from the terminal. That just reveals/hides the option under _System_ (or `Super + Esc`), and then you can see if it works consistently on your system. If not, you can hide it again with the same command.
