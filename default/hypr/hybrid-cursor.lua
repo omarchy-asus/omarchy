@@ -31,15 +31,23 @@ local function card_vendor(card)
   return vendor
 end
 
+-- Two cards can expose a connector with the same name (DP-1 on both), so the
+-- one that reports "connected" owns the monitor; the status file is the cached
+-- state and reading it doesn't probe the GPU.
 local function connector_card(connector)
+  local first = nil
   for index = 0, 15 do
     local file = io.open(drm_path .. "/card" .. index .. "-" .. connector .. "/status", "r")
     if file then
+      local status = file:read("*l")
       file:close()
-      return "card" .. index
+      if status == "connected" then
+        return "card" .. index
+      end
+      first = first or ("card" .. index)
     end
   end
-  return nil
+  return first
 end
 
 -- Hybrid: an NVIDIA card next to a display card from another vendor.

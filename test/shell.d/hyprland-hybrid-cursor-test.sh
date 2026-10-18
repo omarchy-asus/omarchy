@@ -79,6 +79,15 @@ expect "hybrid: a reload with the monitor plugged in re-applies" "1 1" add:HDMI-
 expect "hybrid: a value the user set is left alone" "0 0 0" user:0 add:HDMI-A-1 remove:HDMI-A-1
 
 rm -rf "$OMARCHY_DRM_PATH"
+card 0 0x1002 eDP-1 DP-1
+card 1 0x10de DP-1
+printf 'disconnected\n' >"$OMARCHY_DRM_PATH/card0-DP-1/status"
+expect "hybrid: a connector name on both cards belongs to the connected one" "1" add:DP-1
+printf 'connected\n' >"$OMARCHY_DRM_PATH/card0-DP-1/status"
+printf 'disconnected\n' >"$OMARCHY_DRM_PATH/card1-DP-1/status"
+expect "hybrid: and stays on the iGPU when that one is connected" "2" add:DP-1
+
+rm -rf "$OMARCHY_DRM_PATH"
 card 0 0x10de HDMI-A-1 eDP-1
 expect "NVIDIA only: nothing registered" "events=0"
 
