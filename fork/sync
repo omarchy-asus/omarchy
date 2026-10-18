@@ -1,0 +1,191 @@
+#!/bin/bash
+
+# Bring the fork up to date with omacom/omarchy and rebuild it from its topic branches.
+#
+#   fork/sync [--push]
+#
+# 1. Fetches upstream (omacom/omarchy) and origin.
+# 2. Rebases every branch in fork/branches onto upstream/quattro, so each one stays a clean
+#    pull request. A branch upstream has fully taken is reported and left out.
+# 3. quattro: merges upstream/quattro, then each topic branch with --no-ff. quattro only ever
+#    moves forward, so `omarchy dev link` installs (omarchy-update-dev pulls --ff-only) keep
+#    updating. `git log --merges --grep='^Merge asus/' quattro` lists the merge of each fix.
+# 4. asus/stack: upstream/quattro, one commit with the fork's own files, then every topic
+#    branch's commits in order: the whole fork as one linear series, rebuilt from scratch.
+#
+# All of it happens in a throwaway worktree on detached commits, so branches checked out
+# elsewhere are never disturbed; a local branch is only moved when no worktree has it
+# checked out. Conflicts between topic branches are resolved once by hand; rerere replays
+# the resolution on later runs. Nothing is pushed without --push: topic branches and
+# asus/stack with --force-with-lease; quattro is protected (pull request plus CodeRabbit),
+# so the new quattro goes to a sync/<upstream> branch with a pull request into quattro.
+# Merge it with a merge commit (gh pr merge --merge), never squash or rebase: the topic
+# merges inside it are what the next run reads back.
+
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+push=0
+[[ ${1:-} == --push ]] && push=1
+
+git config rerere.enabled true
+git config rerere.autoupdate true
+if ! git remote get-url upstream >/dev/null 2>&1; then
+  git remote add upstream https://github.com/omacom/omarchy.git
+fi
+git fetch --quiet upstream quattro
+git fetch --quiet origin
+
+mapfile -t branches < <(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' fork/branches | awk '{print $1}')
+fork_files=(README.md ASUS.md fork)
+
+# Not grep -q: it exits at the first match, git then dies of SIGPIPE on a long worktree
+# list, and pipefail turns a match into a failure.
+checked_out() { git worktree list --porcelain | grep -x "branch refs/heads/$1" >/dev/null; }
+# Moves a local branch to a commit. A branch checked out in a clean worktree moves
+# there too; one with uncommitted changes is left alone. Leaving a rebased branch
+# behind would make the next run rebase it again into new commits, and quattro would
+# merge every topic a second time.
+set_branch() {
+  local where
+  [[ $(git rev-parse "$1") == "$2" ]] && return
+  if checked_out "$1"; then
+    where=$(git worktree list --porcelain | awk -v r="branch refs/heads/$1" '/^worktree /{w=substr($0, 10)} $0==r{print w}')
+    if [[ -z $(git -C "$where" status --porcelain) ]]; then
+      git -C "$where" reset --quiet --keep "$2"
+    else
+      echo "  note: $1 has uncommitted changes in $where; its local ref was left alone (new tip ${2:0:9})"
+    fi
+  else
+    git branch --quiet -f "$1" "$2"
+  fi
+}
+# A topic branch's current tip: the local branch if there is one, else origin's.
+tip_of() {
+  if git show-ref --quiet "refs/heads/$1"; then git rev-parse "refs/heads/$1"; else git rev-parse "refs/remotes/origin/$1"; fi
+}
+
+# The patch a topic adds over upstream, as a stable id.
+topic_patch() { git diff "$(git merge-base "$1" upstream/quattro)" "$1" | git patch-id --stable | cut -d' ' -f1; }
+# The same for the version of a topic that quattro (at $2) last merged, if any.
+merged_patch() {
+  local merge
+  # Not --first-parent: since quattro is protected, syncs land through a pull request's
+  # merge commit and the topic merges sit on its second parent.
+  merge=$(git log --format=%H -1 -E --grep="^Merge $1( \(rebased, same patch\))?\$" "$2")
+  [[ -n $merge ]] && topic_patch "$(git rev-parse "$merge^2")"
+}
+
+wt=$(mktemp -d)/wt
+git worktree add --quiet --detach "$wt" upstream/quattro
+cleanup() { git worktree remove --force "$wt" >/dev/null 2>&1 || true; }
+fail() { echo "fork/sync: $*" >&2; echo "fork/sync: the worktree is kept at $wt" >&2; trap - EXIT; exit 1; }
+trap cleanup EXIT
+g() { git -C "$wt" "$@"; }
+
+declare -A tip
+live=()
+for branch in "${branches[@]}"; do
+  ref=$(tip_of "$branch")
+  if ! git cherry upstream/quattro "$ref" | grep -q '^+'; then
+    echo "merged upstream: $branch (remove it from fork/branches)"
+    continue
+  fi
+  live+=("$branch")
+  if git merge-base --is-ancestor upstream/quattro "$ref"; then
+    tip[$branch]=$ref
+    echo "up to date:      $branch"
+  else
+    g checkout --quiet --detach "$ref"
+    g rebase --quiet upstream/quattro || fail "$branch does not rebase cleanly onto upstream/quattro"
+    tip[$branch]=$(g rev-parse HEAD)
+    echo "rebased:         $branch"
+  fi
+  set_branch "$branch" "${tip[$branch]}"
+done
+
+# quattro: upstream first, then every topic branch. Starts from the local quattro when it is
+# ahead of origin's (unpushed fork commits), else from origin's.
+base=origin/quattro
+if git show-ref --quiet refs/heads/quattro && git merge-base --is-ancestor origin/quattro quattro; then
+  base=quattro
+fi
+g checkout --quiet --detach "$base"
+g merge --quiet --no-edit -m "Merge upstream quattro" upstream/quattro
+for branch in "${live[@]}"; do
+  if git merge-base --is-ancestor "${tip[$branch]}" "$(g rev-parse HEAD)"; then
+    continue
+  fi
+  # After upstream moves, every topic is rebased into new commits. When the patch is
+  # the same as the version quattro last merged, merging it again would only replay
+  # hunks quattro already has (and can duplicate them); record the new tip instead.
+  if [[ $(topic_patch "${tip[$branch]}") == "$(merged_patch "$branch" "$(g rev-parse HEAD)")" ]]; then
+    g merge --quiet -s ours --no-edit -m "Merge $branch (rebased, same patch)" "${tip[$branch]}"
+    echo "rebased only:    $branch"
+    continue
+  fi
+  if ! g merge --quiet --no-ff --no-edit -m "Merge $branch" "${tip[$branch]}"; then
+    [[ -z $(g diff --name-only --diff-filter=U) ]] || fail "merging $branch into quattro conflicts; resolve it there, commit, and rerun"
+    echo "  note: $branch merged with a recorded (rerere) resolution in: $(g diff --cached --name-only | tr '\n' ' ')"
+    g commit --quiet --no-edit
+  fi
+  echo "merged into quattro: $branch"
+done
+quattro=$(g rev-parse HEAD)
+
+# asus/stack: the same content as one linear series.
+g checkout --quiet --detach upstream/quattro
+g checkout "$quattro" -- "${fork_files[@]}"
+g commit --quiet -m "Omarchy ASUS: fork documentation and tooling"
+for branch in "${live[@]}"; do
+  for commit in $(git rev-list --reverse --no-merges "upstream/quattro..${tip[$branch]}"); do
+    if ! g cherry-pick "$commit" >/dev/null 2>&1; then
+      [[ -z $(g diff --name-only --diff-filter=U) ]] || fail "stacking $branch ($commit) conflicts; resolve it there and rerun"
+      g -c core.editor=true cherry-pick --continue >/dev/null
+    fi
+  done
+done
+stack=$(g rev-parse HEAD)
+
+# Both are built from the same topics, so any difference is a bad merge resolution
+# (a dropped change or a duplicated hunk). Stop before moving or pushing anything.
+if ! git diff --quiet "$quattro" "$stack"; then
+  git diff --stat "$quattro" "$stack" >&2
+  fail "asus/stack and quattro differ (above); fix the merge in quattro ($quattro) and rerun"
+fi
+
+# quattro moves only forward; the main checkout follows it when it is on quattro and clean.
+if [[ $(git symbolic-ref --short -q HEAD) == quattro && -z $(git status --porcelain) ]]; then
+  git merge --quiet --ff-only "$quattro"
+else
+  set_branch quattro "$quattro"
+fi
+set_branch asus/stack "$stack"
+echo "quattro ${quattro:0:9}, asus/stack ${stack:0:9}, ${#live[@]} topic branches"
+
+if (( push )); then
+  for branch in "${live[@]}"; do
+    git push --quiet --force-with-lease="$branch" origin "${tip[$branch]}:refs/heads/$branch"
+  done
+  git push --quiet --force-with-lease=asus/stack origin "$stack:refs/heads/asus/stack"
+  if git merge-base --is-ancestor "$quattro" origin/quattro; then
+    echo "pushed (quattro already has it)"
+  else
+    # quattro only takes pull requests. One sync branch per upstream commit; a rerun
+    # for the same upstream updates the branch and its open pull request.
+    upstream_short=$(git rev-parse --short=9 upstream/quattro)
+    sync=sync/$upstream_short
+    repo=$(gh repo view "$(git remote get-url origin)" --json nameWithOwner --jq .nameWithOwner)
+    git push --quiet --force origin "$quattro:refs/heads/$sync"
+    if [[ -z $(gh pr list -R "$repo" --head "$sync" --state open --json number --jq '.[].number') ]]; then
+      gh pr create -R "$repo" --base quattro --head "$sync" \
+        --title "Sync with upstream quattro $upstream_short" \
+        --body "fork/sync: merges omacom/omarchy quattro at $upstream_short into quattro and records each topic branch rebased onto it. asus/stack (${stack:0:9}) is pushed and tree-identical to this head.
+
+Merge with a merge commit (\`gh pr merge --merge\`), not squash or rebase: fork/sync reads the topic merges back from quattro's history."
+    fi
+    echo "pushed; quattro waits on the pull request from $sync"
+  fi
+else
+  echo "not pushed (run fork/sync --push)"
+fi

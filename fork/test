@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# Run the test suite, or the given test files, isolated from the desktop session.
+#
+#   fork/test                       ./test/all
+#   fork/test test/shell.d/x-test.sh [...]
+#
+# Run from a live Omarchy session, 21 of upstream's test files fail for reasons that
+# have nothing to do with the code under test, because they inherit the session:
+#   - OMARCHY_PATH=/usr/share/omarchy and no checkout bin/ on PATH: the commands and
+#     catalogs of the installed package run instead of the checkout's.
+#   - XDG_CONFIG_HOME, XDG_DATA_HOME, XDG_STATE_HOME, XDG_CACHE_HOME: tests that only
+#     move HOME still read and write the real directories.
+#   - mise shims on PATH: a shim under a fixture HOME finds no tool (rg, for one).
+#   - QT_QPA_PLATFORMTHEME=gtk3 and no display: qmltestrunner cannot start.
+# This runs them with all of that cleared, never against the visible desktop.
+
+set -euo pipefail
+
+root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+path=$(tr ':' '\n' <<<"$PATH" | grep -v '/mise/shims$' | paste -sd:)
+
+isolated() {
+  env \
+    -u WAYLAND_DISPLAY -u DISPLAY -u HYPRLAND_INSTANCE_SIGNATURE \
+    -u QT_QPA_PLATFORMTHEME \
+    -u XDG_CONFIG_HOME -u XDG_DATA_HOME -u XDG_STATE_HOME -u XDG_CACHE_HOME \
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+    OMARCHY_PATH="$root" PATH="$root/bin:$path" \
+    "$@"
+}
+
+cd "$root"
+if (( $# == 0 )); then
+  isolated ./test/all
+else
+  failed=()
+  for test in "$@"; do
+    isolated bash "$test" </dev/null || failed+=("$test")
+  done
+  if (( ${#failed[@]} > 0 )); then
+    printf '\n%d of %d test files failed:\n' "${#failed[@]}" "$#" >&2
+    printf '  %s\n' "${failed[@]}" >&2
+    exit 1
+  fi
+fi

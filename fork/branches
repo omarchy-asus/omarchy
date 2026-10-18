@@ -1,0 +1,40 @@
+# Topic branches merged into quattro and stacked into asus/stack, in this order.
+# <branch> <kind> <draft>
+#   kind: pr     = written to be opened on omacom/omarchy as it is
+#         carry  = someone else's open upstream pull request, carried until it merges
+#         fork   = stays in the fork (model-specific policy, or upstream said no)
+#   draft: the pull request text under fork/prs/
+# A branch whose commits upstream already has is reported by fork/sync and can be removed here.
+#
+# Package and kernel changes live in rdoupe-omarchy/omarchy-asus-pkgs (drafts here as fork/prs/pkgs-*.md):
+#   nvidia-open-x86_64               NVIDIA #1299, #1412 and #1368 for x86_64 nvidia-open-dkms
+#   linux-omarchy-hid-asus-winlock   hid-asus Win-lock pass-through in linux-omarchy
+#   omarchy-settings-source-monitor  ship the charger-swap monitor unit (companion to asus/usbc-power)
+#   omarchy-settings-nvidia-powerd   ship the nvidia-powerd start-limit drop-in (companion to asus/nvidia-powerd-start-limit)
+#   omarchy-asus                     upstream master with every companion above merged in; install and test from this one
+
+# Power and adapters (ASUS)
+asus/asusd-power-profiles        pr  asusd-power-profiles.md
+asus/usbc-power                  pr  usbc-power.md
+asus/ga605km-quiet-fans          pr  ga605km-quiet-fans.md
+asus/powerprofiles-external-owner pr powerprofiles-external-owner.md
+
+# Hybrid NVIDIA
+asus/hybrid-video-decode         pr  hybrid-video-decode.md
+asus/hdmi-cursor                 pr  hdmi-cursor.md
+carry/initramfs-8263             carry initramfs-8263.md
+asus/nvidia-powerd-start-limit   pr  nvidia-powerd-start-limit.md
+
+# Audio
+asus/audio                       pr  audio.md
+asus/rtkit                       pr  rtkit.md
+
+# Model quirks (GA605KM)
+asus/touchpad-wake               pr  touchpad-wake.md
+asus/hibernate-mode              pr  hibernate-mode.md
+
+# Desktop polling (generic, found while profiling the G16)
+perf/webcam-guard-udev           pr  webcam-guard-udev.md
+perf/monitor-watch-logind        pr  monitor-watch-logind.md
+perf/launcher-icon-index         pr  launcher-icon-index.md
+perf/tailscale-poll              pr  tailscale-poll.md
