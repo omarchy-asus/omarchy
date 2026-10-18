@@ -341,7 +341,6 @@ Panel {
   onOpenedChanged: if (opened) {
     cursorActive = false
     if (panelFlick) panelFlick.contentY = 0
-    tailscale.refresh()
     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
   }
   onPeerIndexChanged: scrollCursorIntoView()
@@ -355,6 +354,9 @@ Panel {
   Service {
     id: tailscale
     settings: root.settings
+    // Opening the panel refreshes everything it shows, exit nodes and accounts
+    // included; see Service.panelOpen.
+    panelOpen: root.opened
   }
 
   Connections {
