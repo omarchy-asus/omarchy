@@ -1,0 +1,19 @@
+[Unit]
+Description=Show an OSD when Fn+Super locks or unlocks Super on ASUS ROG N-Key keyboards
+# The OSD goes through the running Omarchy shell, which needs the OMARCHY_PATH
+# and WAYLAND_DISPLAY that UWSM imports for the graphical session.
+After=graphical-session.target
+PartOf=graphical-session.target
+ConditionEnvironment=OMARCHY_PATH
+ConditionEnvironment=WAYLAND_DISPLAY
+
+[Service]
+Type=simple
+# To clear the lock as soon as Fn+Super sets it instead, add a drop-in with
+# Environment=OMARCHY_ASUS_ROG_WINLOCK_MODE=unlock.
+ExecStart=/usr/bin/omarchy-hw-asus-rog-winlock watch
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target

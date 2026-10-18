@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# omarchy:summary=Detect whether an ASUS ROG laptop has the ROG N-Key keyboard with the Fn+Super Win-key lock.
+
+# The ROG N-Key Keyboard2 (USB 0b05:19b6) is the built-in keyboard of the ROG
+# Zephyrus G16 GA605 among others. Fn+Super on it locks Super in the keyboard
+# firmware. Unprivileged tests fake the USB devices with OMARCHY_SYS_ROOT, the
+# fixture root omarchy-hw-platform reads; root reads only the live one.
+sys=/sys
+if (( EUID != 0 )) && [[ -n ${OMARCHY_SYS_ROOT:-} ]]; then
+  sys=$OMARCHY_SYS_ROOT
+fi
+
+found=0
+if omarchy-hw-asus-rog; then
+  for device in "$sys"/bus/usb/devices/*; do
+    if [[ $(cat "$device/idVendor" 2>/dev/null) == "0b05" && $(cat "$device/idProduct" 2>/dev/null) == "19b6" ]]; then
+      found=1
+    fi
+  done
+fi
+
+(( found ))
