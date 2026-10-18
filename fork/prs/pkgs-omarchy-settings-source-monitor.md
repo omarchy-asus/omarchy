@@ -1,6 +1,6 @@
 # PR draft: omacom/omarchy-pkgs, from rdoupe-omarchy/omarchy-asus-pkgs `omarchy-settings-source-monitor` (f54cd3d6, on upstream master 29c89f78)
 
-NOT opened. Companion to omacom/omarchy#15668 (`asus/usbc-power`); Ryan opens it with or after #15668. Recipe-only, two files, no `pkgrel` bump (same as #922: the 4.0.4 release has no such unit, so its package is unchanged).
+NOT opened. Companion to omacom/omarchy#15668 (`asus/usbc-power`); the maintainer opens it with or after #15668. Recipe-only, two files, no `pkgrel` bump (same as #922: the 4.0.4 release has no such unit, so its package is unchanged).
 
 ## Title
 

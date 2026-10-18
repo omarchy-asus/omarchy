@@ -2,7 +2,7 @@
 
 Applies to `asus/asusd-power-profiles`, `asus/usbc-power`, `asus/ga605km-quiet-fans`.
 
-2026-10-16 results: on USB-C `charge_mode` reads 18 (0x12; bit 1 set, bit 0 clear), on the barrel 1, on battery 0; `omarchy-hw-asus-rog-usbc-power` answered correctly in all three (g16reverse `captures/hwtest-1016-0149.log`). Post-reboot asusd check: after the 2026-10-16 07:53 boot, `ChangePlatformProfileOnAc`, `ChangePlatformProfileOnBattery` and `PlatformProfileLinkedEpp` all read `b false`, persisted in `/etc/asusd/asusd.ron` (these were set live over D-Bus, the same three properties the drop-in and migration set; one boot with the drop-in itself installed is still worth doing). Still open: the quiet-fans run with the branch installed.
+2026-10-16 results: on USB-C `charge_mode` reads 18 (0x12; bit 1 set, bit 0 clear), on the barrel 1, on battery 0; `omarchy-hw-asus-rog-usbc-power` answered correctly in all three (hardware test log of 2026-10-16, kept in the private research notes). Post-reboot asusd check: after the 2026-10-16 07:53 boot, `ChangePlatformProfileOnAc`, `ChangePlatformProfileOnBattery` and `PlatformProfileLinkedEpp` all read `b false`, persisted in `/etc/asusd/asusd.ron` (these were set live over D-Bus, the same three properties the drop-in and migration set; one boot with the drop-in itself installed is still worth doing). Still open: the quiet-fans run with the branch installed.
 
 ## Validate on real hardware before upstreaming
 

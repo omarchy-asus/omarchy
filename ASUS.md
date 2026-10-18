@@ -58,4 +58,4 @@ The table in [README.md](README.md) is the single list of fixes and where each o
 
 ## Evidence
 
-Measurements, firmware analysis and test logs live in the private research repo (`g16reverse`); each pull request quotes the evidence it needs.
+Measurements, firmware analysis and test logs live in the maintainer's private research notes; each pull request quotes the evidence it needs.

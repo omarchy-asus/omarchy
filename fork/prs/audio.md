@@ -37,4 +37,4 @@ This PR was written with Claude Code (an AI agent); I reviewed it and ran the te
 
 - #7459 (open, not ours) edits the same `fix-audio-mixer.sh`; whichever merges second needs a rebase. Intent does not conflict ("Master is left alone; it is set once at install").
 - omarchybot (2026-10-11) said the choice among the options is the maintainer's. Consider a one-line comment on #11046 pointing at this PR rather than opening cold.
-- Ported from the uncommitted 2026-10-04 draft in `~/Work/omarchy/omarchy-asus-master` (left untouched), plus the soft-mixer guard and a fresh timestamp.
+- Ported from an uncommitted local draft of 2026-10-04 (left untouched), plus the soft-mixer guard and a fresh timestamp.
