@@ -148,6 +148,29 @@ assert(
   'app library keeps owning an OSD a previous launch left on screen'
 )
 
+const refreshMatch = appLibraryQml.match(/function refreshIcons\(\) \{([\s\S]*?)\n  \}/)
+assert(
+  refreshMatch && refreshMatch[1].includes('root.iconIndexScannedAt') &&
+    refreshMatch[1].includes('root.iconRefreshMinIntervalMs'),
+  'opening a consumer rescans icons only once the last scan has aged'
+)
+const iconScanMatch = appLibraryQml.match(/id: iconIndexScan\n([\s\S]*?)\n  \}/)
+assert(
+  iconScanMatch && iconScanMatch[1].includes('StdioCollector') &&
+    iconScanMatch[1].includes('root.indexIconText(text)') && !iconScanMatch[1].includes('SplitParser'),
+  'the icon scan is indexed in one pass rather than one callback per path'
+)
+assert(
+  /function indexIconText\(text\) \{[\s\S]*?root\.iconIndexScannedAt = Date\.now\(\)/.test(appLibraryQml),
+  'a finished icon scan records when it ran'
+)
+const debounceMatch = appLibraryQml.match(/id: iconIndexDebounce\n([\s\S]*?)\n  \}/)
+assert(
+  debounceMatch && debounceMatch[1].includes('root.iconRescanPending = true') &&
+    iconScanMatch && /onExited:[\s\S]*root\.iconRescanPending = false[\s\S]*iconIndexScan\.running = true/.test(iconScanMatch[1]),
+  'an app-list change during a scan runs one more scan when it exits, past the open throttle'
+)
+
 const openMatch = menuQml.match(/function openExistingMenu\(initialMenu\) \{([\s\S]*?)\n  \}/)
 assert(openMatch, 'menu openExistingMenu function exists')
 assert(
