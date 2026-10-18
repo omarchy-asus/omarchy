@@ -110,6 +110,27 @@ grep -Fxq 'limine-mkinitcpio' "$calls" || fail "a failed rebuild is retried on t
 [[ -f $rebuild_marker ]] || fail "the retry records the repair"
 pass "migration retries after a failed rebuild"
 
+# A drop-in that is not the one Omarchy's installer wrote is the user's: it may
+# carry other modules or options, so it stays, with nothing rebuilt or marked.
+write_pci_devices 0x8086:0x030000 0x10de:0x030200
+rm -f "$rebuild_marker"
+user_conf_body='MODULES+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
+FILES+=(/etc/modprobe.d/nvidia-power.conf)'
+printf '%s\n' "$user_conf_body" >"$nvidia_conf"
+: >"$calls"
+output=$(PATH="$stub_bin:$ROOT/bin:$PATH" \
+  TEST_LOG="$calls" \
+  OMARCHY_MKINITCPIO_NVIDIA_CONF="$nvidia_conf" \
+  OMARCHY_NVIDIA_REBUILD_MARKER="$rebuild_marker" \
+  OMARCHY_PCI_DEVICES_PATH="$test_tmp/devices" \
+  bash -euo pipefail "$migration" 2>&1)
+
+[[ -f $nvidia_conf && $(<"$nvidia_conf") == "$user_conf_body" ]] || fail "a drop-in the user changed is kept"
+[[ ! -s $calls ]] || fail "a drop-in the user changed causes no rebuild" "$(cat "$calls")"
+[[ ! -e $rebuild_marker ]] || fail "a kept drop-in is not marked as repaired"
+[[ $output == *"$nvidia_conf"* ]] || fail "the migration says why it kept the drop-in" "$output"
+pass "migration keeps an nvidia drop-in Omarchy did not write"
+
 # NVIDIA-only desktop: the early load is what gives it KMS at the LUKS prompt.
 write_pci_devices 0x10de:0x030000
 rm -f "$rebuild_marker"
