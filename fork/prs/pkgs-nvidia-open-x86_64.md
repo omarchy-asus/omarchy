@@ -1,6 +1,6 @@
 # PR draft: omacom/omarchy-pkgs, from rdoupe-omarchy/omarchy-asus-pkgs `nvidia-open-x86_64` (9c7c0a1b)
 
-NOT opened. Ryan reviews it and opens it from his account, or asks for it to be opened. One package, recipe-only (`pkgbuilds/nvidia-open-dkms/`), so it qualifies for the self-merge path once builds are approved (`build-approved` label; we are not in VOUCHED.td).
+NOT opened. The maintainer reviews it and opens it from their own account, or asks for it to be opened. One package, recipe-only (`pkgbuilds/nvidia-open-dkms/`), so it qualifies for the self-merge path once builds are approved (`build-approved` label; we are not in VOUCHED.td).
 
 ## Title
 
@@ -44,4 +44,4 @@ This PR was prepared with an AI agent (Claude Code) working from my measurements
 ## Before opening
 
 - Re-check that #1299/#1412 are still open and unchanged (`gh pr diff`). If NVIDIA has shipped either, drop it.
-- Optionally run the 615 package on the G16 first (`~/Work/omarchy-g16/builds/nvidia-open-dkms-615/INSTALL.md`) and replace "Not done: running 615" with the result.
+- Optionally run the 615 package on the G16 first (with the local 615 build's install notes) and replace "Not done: running 615" with the result.

@@ -2,7 +2,7 @@ Branch: `asus/hibernate-mode`
 
 # Hibernate the ROG Zephyrus G16 GA605KM in shutdown mode
 
-Open after the comment on #8589 (g16reverse `upstream/reports/06-omarchy-hibernate-mode-shutdown.md`): the maintainer's gating choice there decides whether this goes up per model (the #8017 pattern).
+Open after the comment on #8589 (drafted in the private research notes): the maintainer's gating choice there decides whether this goes up per model (the #8017 pattern).
 
 **Problem.** On the GA605KM, a hibernate in systemd's default platform mode can end in a hard reset. On 2026-10-14 the kernel wrote the image, saw a pending wakeup event and rolled back (`PM: hibernation: Wakeup event detected during hibernation, rolling back.`). The rollback powered the RTX 5060 back up mid-transition, the NVIDIA driver failed to restore its channels (`WARNING: nvidia/nv.c:4524 at nv_restore_user_channels`) and the laptop had to be reset; the session was lost.
 
