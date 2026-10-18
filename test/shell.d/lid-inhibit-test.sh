@@ -103,6 +103,13 @@ cat >"$fake_bin/omarchy-hw-laptop" <<'SH'
 [[ $OMARCHY_TEST_LAPTOP == 1 ]]
 SH
 
+# Logind's events are not part of this test; keep the watcher off the real bus.
+cat >"$fake_bin/gdbus" <<'SH'
+#!/bin/bash
+
+exec sleep infinity
+SH
+
 cat >"$fake_bin/hyprctl" <<'SH'
 #!/bin/bash
 
