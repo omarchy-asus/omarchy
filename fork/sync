@@ -36,7 +36,9 @@ git fetch --quiet origin
 mapfile -t branches < <(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' fork/branches | awk '{print $1}')
 fork_files=(README.md ASUS.md fork)
 
-checked_out() { git worktree list --porcelain | grep -qx "branch refs/heads/$1"; }
+# Not grep -q: it exits at the first match, git then dies of SIGPIPE on a long worktree
+# list, and pipefail turns a match into a failure.
+checked_out() { git worktree list --porcelain | grep -x "branch refs/heads/$1" >/dev/null; }
 # Moves a local branch to a commit. A branch checked out in a clean worktree moves
 # there too; one with uncommitted changes is left alone. Leaving a rebased branch
 # behind would make the next run rebase it again into new commits, and quattro would
