@@ -1,0 +1,6 @@
+# The power profile follows the power source from the shell, which has no
+# terminal for a password, so the ROG Zephyrus G16 GA605KM's quiet battery
+# fans must not stop for one. The rule names both arguments whole (no
+# wildcard), and the helper writes only the ASUS platform profile handler, only
+# between balanced and quiet, and only on that model.
+%wheel ALL=(root) NOPASSWD: /usr/bin/omarchy-powerprofiles-asus-quiet-fans on, /usr/bin/omarchy-powerprofiles-asus-quiet-fans off
