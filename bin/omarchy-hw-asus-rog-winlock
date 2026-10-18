@@ -1,0 +1,216 @@
+#!/usr/bin/python3
+
+# omarchy:summary=Show and control the Fn+Super Win-key lock of the ASUS ROG N-Key keyboard
+# omarchy:args=<watch [--mode toast|unlock]|status|lock|unlock|toggle>
+# omarchy:examples=omarchy hw asus-rog-winlock status | omarchy hw asus-rog-winlock watch --mode unlock
+
+# Fn+Super on the ROG N-Key Keyboard2 (USB 0b05:19b6, the built-in keyboard of
+# the ROG Zephyrus G16 GA605 among others) toggles a Win-key lock in the
+# keyboard firmware. While it is on, Super sends nothing, and nothing on screen
+# says why. The keyboard reports each change as HID report 5d bf 01 <state>,
+# and takes the lock state as feature report 5d bf 00 <state> committed by
+# output report 01 01 (the sequence ASUS's own Windows service uses).
+#
+# `watch` follows those reports on hidraw and shows an OSD for each change.
+# Stock hid-asus drops every 0x5d report as an AURA lighting echo, so on a
+# kernel without the Win-lock pass-through ("HID: asus: pass through ROG N-Key
+# Win-lock reports", sent to linux-input) `watch` sees nothing and shows
+# nothing. `status`, `lock`, `unlock` and `toggle` talk to the keyboard
+# directly and work on any kernel.
+#
+# Python rather than bash because setting and reading a feature report is a
+# HIDIOCSFEATURE/HIDIOCGFEATURE ioctl on the hidraw node, which no shell tool
+# can issue.
+
+import argparse
+import fcntl
+import glob
+import os
+import select
+import subprocess
+import sys
+import time
+
+HID_ID = "0003:00000B05:000019B6"
+REPORT_ID = 0x5D
+REPORT_LEN = 64
+# HIDIOCSFEATURE(64) and HIDIOCGFEATURE(64) from linux/hidraw.h.
+HIDIOCSFEATURE = 0xC0404806
+HIDIOCGFEATURE = 0xC0404807
+
+RULE = "/etc/udev/rules.d/70-asus-rog-winlock.rules"
+
+ICON_LOCKED = "󰌾"
+ICON_UNLOCKED = "󰌿"
+ICON_FAILED = "󰀦"
+
+
+def has_report_id(descriptor, wanted):
+    """Walk the HID report descriptor's items looking for Report ID `wanted`."""
+    i = 0
+    while i < len(descriptor):
+        prefix = descriptor[i]
+        if prefix == 0xFE:
+            # Long item: size byte, tag byte, then the data.
+            i += 3 + (descriptor[i + 1] if i + 1 < len(descriptor) else 0)
+            continue
+        size = (0, 1, 2, 4)[prefix & 0x03]
+        if prefix & 0xFC == 0x84 and size and descriptor[i + 1:i + 1 + size] == bytes([wanted]) + bytes(size - 1):
+            return True
+        i += 1 + size
+    return False
+
+
+def find_hidraw():
+    """The keyboard exposes several hidraw nodes; pick the one carrying report 0x5d."""
+    nodes = []
+    for uevent in sorted(glob.glob("/sys/class/hidraw/hidraw*/device/uevent")):
+        try:
+            with open(uevent, errors="replace") as f:
+                ids = [line.strip().upper() for line in f if line.startswith("HID_ID=")]
+        except OSError:
+            continue
+        if ids != [f"HID_ID={HID_ID}"]:
+            continue
+        device = os.path.dirname(uevent)
+        node = "/dev/" + os.path.basename(os.path.dirname(device))
+        try:
+            with open(os.path.join(device, "report_descriptor"), "rb") as f:
+                if has_report_id(f.read(), REPORT_ID):
+                    return node
+        except OSError:
+            pass
+        nodes.append(node)
+    if nodes:
+        return nodes[0]
+    sys.exit("No ASUS ROG N-Key keyboard (0b05:19b6) found")
+
+
+def open_hidraw(writable):
+    node = find_hidraw()
+    try:
+        return os.open(node, (os.O_RDWR if writable else os.O_RDONLY) | os.O_NONBLOCK), node
+    except PermissionError as e:
+        sys.exit(f"Cannot open {node} ({e.strerror}). {RULE} grants the seat user access; log in again or replug once it is installed.")
+
+
+def set_lock(locked):
+    fd, node = open_hidraw(writable=True)
+    try:
+        report = bytearray(REPORT_LEN)
+        report[0:4] = bytes([REPORT_ID, 0xBF, 0x00, 0x01 if locked else 0x00])
+        fcntl.ioctl(fd, HIDIOCSFEATURE, report, True)
+        # The keyboard applies the new state on this output report, not on a
+        # second feature report.
+        os.write(fd, bytes([0x01, 0x01]))
+    finally:
+        os.close(fd)
+    print(f"{node}: Win-key lock {'on' if locked else 'off'}")
+
+
+def get_lock():
+    """Best effort: the firmware's feature report carries the lock state in byte 3."""
+    fd, node = open_hidraw(writable=True)
+    try:
+        report = bytearray(REPORT_LEN)
+        report[0] = REPORT_ID
+        try:
+            fcntl.ioctl(fd, HIDIOCGFEATURE, report, True)
+        except OSError as e:
+            print(f"{node}: reading the feature report failed: {e.strerror}", file=sys.stderr)
+            return None
+    finally:
+        os.close(fd)
+    locked = bool(report[3])
+    print(f"{node}: Win-key lock {'on' if locked else 'off'} (feature report {report[:8].hex(' ')})")
+    return locked
+
+
+def tr(command):
+    try:
+        return subprocess.run(command.split(), capture_output=True, text=True).stdout.strip()
+    except OSError:
+        return ""
+
+
+def osd(icon, message, duration=2000):
+    subprocess.run(["omarchy-osd", "-i", icon, "-m", message, "-d", str(duration)], check=False)
+
+
+def watch(mode):
+    fd, node = open_hidraw(writable=False)
+    print(f"Watching {node} for Fn+Super ({mode} mode)", flush=True)
+    # Unlocking ourselves makes the keyboard report the unlock too; skip one
+    # unlock report per unlock sent, so it does not show a second OSD.
+    own_unlocks = 0
+    try:
+        while True:
+            select.select([fd], [], [])
+            try:
+                data = os.read(fd, REPORT_LEN)
+            except BlockingIOError:
+                continue
+            if not data:
+                sys.exit(f"{node} went away")
+            if len(data) < 4 or data[:3] != bytes([REPORT_ID, 0xBF, 0x01]):
+                continue
+            locked = bool(data[3])
+            print(f"[{time.strftime('%H:%M:%S')}] Win-key lock {'on' if locked else 'off'}", flush=True)
+
+            if not locked:
+                if own_unlocks:
+                    own_unlocks -= 1
+                else:
+                    osd(ICON_UNLOCKED, tr("omarchy-i18n input.superUnlocked"))
+            elif mode == "unlock":
+                own_unlocks += 1
+                try:
+                    set_lock(False)
+                    osd(ICON_UNLOCKED, tr("omarchy-i18n input.superAutoUnlocked"))
+                except (OSError, SystemExit) as e:
+                    own_unlocks -= 1
+                    print(e, file=sys.stderr)
+                    osd(ICON_FAILED, tr("omarchy-i18n input.superUnlockFailed"), 4000)
+            else:
+                osd(ICON_LOCKED, tr("omarchy-i18n input.superLocked"))
+    except KeyboardInterrupt:
+        pass
+    finally:
+        os.close(fd)
+
+
+def main():
+    parser = argparse.ArgumentParser(prog="omarchy-hw-asus-rog-winlock", description="Show and control the Fn+Super Win-key lock of the ASUS ROG N-Key keyboard.")
+    commands = parser.add_subparsers(dest="command", required=True)
+    watch_parser = commands.add_parser("watch", help="show an OSD when Fn+Super changes the lock")
+    watch_parser.add_argument(
+        "--mode",
+        choices=("toast", "unlock"),
+        default=os.environ.get("OMARCHY_ASUS_ROG_WINLOCK_MODE") or "toast",
+        help="toast: show the change; unlock: clear the lock as soon as it is set (default: $OMARCHY_ASUS_ROG_WINLOCK_MODE, else toast)",
+    )
+    commands.add_parser("status", help="print the lock state")
+    commands.add_parser("lock", help="lock Super")
+    commands.add_parser("unlock", help="unlock Super")
+    commands.add_parser("toggle", help="invert the lock state")
+    args = parser.parse_args()
+
+    if args.command == "watch":
+        watch(args.mode)
+    elif args.command == "status":
+        if get_lock() is None:
+            return 1
+    elif args.command == "lock":
+        set_lock(True)
+    elif args.command == "unlock":
+        set_lock(False)
+    elif args.command == "toggle":
+        locked = get_lock()
+        if locked is None:
+            sys.exit("Cannot toggle without reading the current state")
+        set_lock(not locked)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

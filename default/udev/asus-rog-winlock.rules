@@ -1,0 +1,5 @@
+# Give the active desktop user access to the ASUS ROG N-Key keyboard's hidraw
+# nodes, so omarchy-hw-asus-rog-winlock can read its Fn+Super Win-key lock
+# reports and set the lock. Installed as a 70- rule: uaccess only takes effect
+# when it is tagged before systemd's 73-seat-late.rules.
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0b05", ATTRS{idProduct}=="19b6", TAG+="uaccess"
