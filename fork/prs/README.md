@@ -56,4 +56,3 @@ Once our own fixes are shipped, go through the other Omarchy ASUS projects for t
 | Z13 setup scripts (`Cliffback/omarchy-rog-z13-setup` and forks) | Every manual setup step | Missing defaults or kernel quirks to upstream |
 | Control panels (`moneytosms/omarchy-asus`, `omarchy-rog-hub`, `omarchy-rog-control`, `omarchy-rog-helper`) | Fan, profile and charge-limit behaviour | Automatic policy (we already have it for profiles and fans); one Omarchy control for the charge limit (#13205/#15431) |
 | `Lafrid0n/omarchy-nvidia-hybrid-fix` | NVIDIA early KMS taking the display on hybrid laptops | Already #8263 (`carry/initramfs-8263`); evidence for it |
-| Speakers ([discussion #1](https://github.com/rdoupe-omarchy/omarchy-asus/discussions/1)) | Windows' Dolby volume maximizer (+6 dB) with a multiband regulator, virtualizer | `asus/g16-speaker-tuning` (unpushed): the static curve is built and barely audible; the maximizer is tabled |
