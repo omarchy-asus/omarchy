@@ -9,15 +9,18 @@
 #    pull request. A branch upstream has fully taken is reported and left out.
 # 3. quattro: merges upstream/quattro, then each topic branch with --no-ff. quattro only ever
 #    moves forward, so `omarchy dev link` installs (omarchy-update-dev pulls --ff-only) keep
-#    updating. `git log --first-parent quattro` lists one merge per fix.
+#    updating. `git log --merges --grep='^Merge asus/' quattro` lists the merge of each fix.
 # 4. asus/stack: upstream/quattro, one commit with the fork's own files, then every topic
 #    branch's commits in order: the whole fork as one linear series, rebuilt from scratch.
 #
 # All of it happens in a throwaway worktree on detached commits, so branches checked out
 # elsewhere are never disturbed; a local branch is only moved when no worktree has it
 # checked out. Conflicts between topic branches are resolved once by hand; rerere replays
-# the resolution on later runs. Nothing is pushed without --push (topic branches and
-# asus/stack with --force-with-lease, quattro only as a fast-forward).
+# the resolution on later runs. Nothing is pushed without --push: topic branches and
+# asus/stack with --force-with-lease; quattro is protected (pull request plus CodeRabbit),
+# so the new quattro goes to a sync/<upstream> branch with a pull request into quattro.
+# Merge it with a merge commit (gh pr merge --merge), never squash or rebase: the topic
+# merges inside it are what the next run reads back.
 
 set -euo pipefail
 
@@ -36,7 +39,9 @@ git fetch --quiet origin
 mapfile -t branches < <(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' fork/branches | awk '{print $1}')
 fork_files=(README.md ASUS.md fork)
 
-checked_out() { git worktree list --porcelain | grep -qx "branch refs/heads/$1"; }
+# Not grep -q: it exits at the first match, git then dies of SIGPIPE on a long worktree
+# list, and pipefail turns a match into a failure.
+checked_out() { git worktree list --porcelain | grep -x "branch refs/heads/$1" >/dev/null; }
 # Moves a local branch to a commit. A branch checked out in a clean worktree moves
 # there too; one with uncommitted changes is left alone. Leaving a rebased branch
 # behind would make the next run rebase it again into new commits, and quattro would
@@ -65,7 +70,9 @@ topic_patch() { git diff "$(git merge-base "$1" upstream/quattro)" "$1" | git pa
 # The same for the version of a topic that quattro (at $2) last merged, if any.
 merged_patch() {
   local merge
-  merge=$(git log --first-parent --format=%H -1 -E --grep="^Merge $1( \(rebased, same patch\))?\$" "$2")
+  # Not --first-parent: since quattro is protected, syncs land through a pull request's
+  # merge commit and the topic merges sit on its second parent.
+  merge=$(git log --format=%H -1 -E --grep="^Merge $1( \(rebased, same patch\))?\$" "$2")
   [[ -n $merge ]] && topic_patch "$(git rev-parse "$merge^2")"
 }
 
@@ -157,12 +164,28 @@ set_branch asus/stack "$stack"
 echo "quattro ${quattro:0:9}, asus/stack ${stack:0:9}, ${#live[@]} topic branches"
 
 if (( push )); then
-  git push --quiet origin "$quattro:refs/heads/quattro"
   for branch in "${live[@]}"; do
     git push --quiet --force-with-lease="$branch" origin "${tip[$branch]}:refs/heads/$branch"
   done
   git push --quiet --force-with-lease=asus/stack origin "$stack:refs/heads/asus/stack"
-  echo "pushed"
+  if git merge-base --is-ancestor "$quattro" origin/quattro; then
+    echo "pushed (quattro already has it)"
+  else
+    # quattro only takes pull requests. One sync branch per upstream commit; a rerun
+    # for the same upstream updates the branch and its open pull request.
+    upstream_short=$(git rev-parse --short=9 upstream/quattro)
+    sync=sync/$upstream_short
+    repo=$(gh repo view "$(git remote get-url origin)" --json nameWithOwner --jq .nameWithOwner)
+    git push --quiet --force origin "$quattro:refs/heads/$sync"
+    if [[ -z $(gh pr list -R "$repo" --head "$sync" --state open --json number --jq '.[].number') ]]; then
+      gh pr create -R "$repo" --base quattro --head "$sync" \
+        --title "Sync with upstream quattro $upstream_short" \
+        --body "fork/sync: merges omacom/omarchy quattro at $upstream_short into quattro and records each topic branch rebased onto it. asus/stack (${stack:0:9}) is pushed and tree-identical to this head.
+
+Merge with a merge commit (\`gh pr merge --merge\`), not squash or rebase: fork/sync reads the topic merges back from quattro's history."
+    fi
+    echo "pushed; quattro waits on the pull request from $sync"
+  fi
 else
   echo "not pushed (run fork/sync --push)"
 fi
