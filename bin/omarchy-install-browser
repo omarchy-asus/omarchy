@@ -5,6 +5,7 @@
 # omarchy:examples=omarchy install browser firefox | omarchy install browser brave
 
 source "$OMARCHY_PATH/install/helpers/browser-policy.sh"
+source "$OMARCHY_PATH/install/helpers/hybrid-video-decode.sh"
 
 setup_chromium_policy_directory() {
   browser_policy_setup_dir "$1"
@@ -18,6 +19,7 @@ announce_browser_installed() {
 copy_chromium_flags() {
   mkdir -p ~/.config
   cp -f "$OMARCHY_PATH/config/chromium-flags.conf" "$1"
+  hybrid_video_pin_chromium "$1"
   omarchy-install-chromium-copy-url
   omarchy-install-chromium-ytdlp
 }

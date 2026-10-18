@@ -2,6 +2,8 @@
 
 # omarchy:summary=Refresh the ~/.config/chromium-flags.conf file from the Omarchy defaults.
 
+source "$OMARCHY_PATH/install/helpers/hybrid-video-decode.sh"
+
 CONFIG_FILE="$HOME/.config/chromium-flags.conf"
 INSTALL_GOOGLE_ACCOUNTS=false
 
@@ -14,6 +16,9 @@ fi
 
 # Refresh the Chromium configuration
 omarchy-refresh-config chromium-flags.conf
+
+# Keep video decode on the iGPU of a hybrid laptop
+hybrid_video_pin_chromium "$CONFIG_FILE"
 
 # Install/refresh the native messaging hosts used by the bundled extensions
 omarchy-install-chromium-copy-url
