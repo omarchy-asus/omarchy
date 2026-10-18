@@ -1,0 +1,65 @@
+#!/bin/bash
+
+# Rebase every topic branch in ./branches onto omacom/omarchy quattro and force-push it
+# to the fork with a lease.
+#
+#   ./rebase-topics [--dry-run]
+#
+# Run it from a clone of omarchy-asus/omarchy (this fork-tools branch checked out).
+# It works on the fork's remote branches in a throwaway worktree; no local branch moves.
+# Reports, per branch: up to date, rebased, upstream has it (left alone; remove it from
+# ./branches), or conflict (left un-pushed at its old tip; rebase it by hand).
+
+set -euo pipefail
+
+here=$(cd "$(dirname "$0")" && pwd)
+cd "$here"
+dry=0
+[[ ${1:-} == --dry-run ]] && dry=1
+
+fork=$(git remote -v | awk '$2 ~ /omarchy-asus\/omarchy(\.git)?$/ && $3 == "(push)" {print $1; exit}')
+[[ -n $fork ]] || { echo "rebase-topics: no remote points at omarchy-asus/omarchy" >&2; exit 1; }
+if ! git remote get-url upstream >/dev/null 2>&1; then
+  git remote add upstream https://github.com/omacom/omarchy.git
+fi
+git fetch --quiet upstream quattro
+git fetch --quiet --prune "$fork"
+base=$(git rev-parse upstream/quattro)
+
+mapfile -t branches < <(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' branches | awk '{print $1}')
+
+wt=$(mktemp -d)
+git worktree add --quiet --detach "$wt/wt" "$base"
+trap 'git worktree remove --force "$wt/wt" >/dev/null 2>&1 || true; rm -rf "$wt"' EXIT
+g() { git -C "$wt/wt" "$@"; }
+
+upstreamed=() conflicts=() missing=()
+for b in "${branches[@]}"; do
+  if ! old=$(git rev-parse --verify --quiet "refs/remotes/$fork/$b"); then
+    echo "missing:         $b"; missing+=("$b"); continue
+  fi
+  if ! git cherry "$base" "$old" | grep '^+' >/dev/null; then
+    echo "upstream has it: $b"; upstreamed+=("$b"); continue
+  fi
+  if git merge-base --is-ancestor "$base" "$old"; then
+    echo "up to date:      $b"; continue
+  fi
+  g checkout --quiet --detach "$old"
+  if ! g rebase --quiet "$base" >/dev/null 2>&1; then
+    g rebase --abort
+    echo "conflict:        $b (left at ${old:0:8})"; conflicts+=("$b"); continue
+  fi
+  new=$(g rev-parse HEAD)
+  if ((dry)); then
+    echo "would push:      $b ${old:0:8} -> ${new:0:8}"
+  else
+    git push --quiet --force-with-lease="refs/heads/$b:$old" "$fork" "$new:refs/heads/$b"
+    echo "rebased:         $b ${old:0:8} -> ${new:0:8}"
+  fi
+done
+
+echo
+echo "upstream has: ${upstreamed[*]:-none}"
+echo "conflicts:    ${conflicts[*]:-none}"
+echo "missing:      ${missing[*]:-none}"
+((${#conflicts[@]} == 0))

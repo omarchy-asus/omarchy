@@ -1,0 +1,37 @@
+name: Sync quattro with upstream
+
+# Fast-forwards quattro to omacom/omarchy quattro. quattro is a plain mirror: if it ever
+# has commits upstream doesn't, this fails instead of merging.
+#
+# GITHUB_TOKEN can't push commits that change upstream's .github/workflows files. If a run
+# fails for that reason, add a SYNC_TOKEN secret (a token with contents and workflows
+# write on this repo); the job uses it when it is set.
+
+on:
+  schedule:
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fast-forward quattro
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN || github.token }}
+          REPO: ${{ github.repository }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          ahead=$(gh api "repos/$REPO/compare/omacom:quattro...$OWNER:quattro" --jq .ahead_by)
+          if [ "$ahead" != 0 ]; then
+            echo "::error::quattro has $ahead commit(s) that omacom/omarchy quattro doesn't; refusing to merge"
+            exit 1
+          fi
+          gh api -X POST "repos/$REPO/merge-upstream" -f branch=quattro
+        shell: bash

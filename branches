@@ -1,0 +1,50 @@
+# Topic branches on omarchy-asus/omarchy, each kept rebased on omacom/omarchy quattro
+# by ./rebase-topics.
+#
+# <branch> <kind> <draft or pull request>
+#   kind: pr    = written to be opened on omacom/omarchy as it is; draft under prs/
+#         open  = head of an open pull request on omacom/omarchy (a squashed copy of a
+#                 topic branch); rebasing it updates that pull request
+#         carry = someone else's open upstream pull request, carried until it merges
+#         fork  = stays in the fork (model-specific policy, or upstream said no)
+#
+# A branch whose commits upstream already has is reported by ./rebase-topics; remove it here.
+# Package and kernel changes live in omarchy-asus/omarchy-pkgs (drafts as prs/pkgs-*.md).
+# The shipped G16 fixes are patch files in omarchy-asus/omarchy-asus, built on stock
+# omarchy releases (fork branch asus/v4-0-5 holds that backport; it is not listed here).
+
+# Power and adapters (ASUS)
+asus/asusd-power-profiles         pr    asusd-power-profiles.md
+asus/usbc-power                   pr    usbc-power.md
+asus/ga605km-quiet-fans           pr    ga605km-quiet-fans.md
+asus/powerprofiles-external-owner pr    powerprofiles-external-owner.md
+
+# Hybrid NVIDIA
+asus/hybrid-video-decode          pr    hybrid-video-decode.md
+asus/hdmi-cursor                  pr    hdmi-cursor.md
+carry/initramfs-8263              carry initramfs-8263.md
+asus/nvidia-powerd-start-limit    pr    nvidia-powerd-start-limit.md
+
+# Audio
+asus/audio                        pr    audio.md
+asus/rtkit                        pr    rtkit.md
+
+# Model quirks (GA605KM)
+asus/touchpad-wake                pr    touchpad-wake.md
+asus/hibernate-mode               pr    hibernate-mode.md
+
+# Keyboard (ROG N-Key)
+asus/rog-winlock                  pr    -
+
+# Desktop polling (generic, found while profiling the G16)
+perf/webcam-guard-udev            pr    webcam-guard-udev.md
+perf/monitor-watch-logind         pr    monitor-watch-logind.md
+perf/launcher-icon-index          pr    launcher-icon-index.md
+perf/tailscale-poll               pr    tailscale-poll.md
+
+# Open upstream pull requests
+pr/asusd-power-profiles           open  omacom/omarchy#15667
+pr/usbc-power                     open  omacom/omarchy#15668
+pr/powerprofiles-external-owner   open  omacom/omarchy#15669
+pr/webcam-guard-udev              open  omacom/omarchy#15670
+pr/tailscale-poll                 open  omacom/omarchy#15671
