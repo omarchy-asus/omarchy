@@ -7,10 +7,14 @@ local nvidia_without_gsp = paths.omarchy_path .. "/bin/omarchy-hw-nvidia-without
 local igpu_render_node = paths.omarchy_path .. "/bin/omarchy-hw-igpu-render-node"
 
 -- Video decode pins (install/helpers/hybrid-video-decode.sh) name the iGPU's
--- render node by PCI path. True when one names a device that is gone or is not
--- a non-NVIDIA display device any more: a MUX switch, an iGPU turned off in
--- firmware, a BIOS update that moved the address. Reads the config files and
--- cached sysfs IDs only, never a device node.
+-- render node by PCI path. True when one Omarchy wrote (the line right under
+-- its marker comment) names a device that is gone or is not a non-NVIDIA
+-- display device any more: a MUX switch, an iGPU turned off in firmware, a BIOS
+-- update that moved the address. A render node the user set is theirs, even the
+-- NVIDIA GPU's. Reads the config files and cached sysfs IDs only, never a
+-- device node.
+local hybrid_video_pin_marker =
+  "# Omarchy repins the next line if the iGPU moves. Delete this comment to keep the line as your own."
 local function hybrid_video_pin_stale()
   local home = os.getenv("HOME") or ""
   local devices = os.getenv("OMARCHY_PCI_DEVICES_PATH") or "/sys/bus/pci/devices"
@@ -26,9 +30,10 @@ local function hybrid_video_pin_stale()
   for _, name in ipairs(files) do
     local file = io.open(home .. name, "r")
     if file then
+      local marked = false
       for line in file:lines() do
-        local address = line:match("^%s*%-%-render%-node%-override=%S*/by%-path/pci%-(.-)%-render%s*$")
-          or line:match("^%s*%-?%-?vaapi%-device%s*=%s*%S*/by%-path/pci%-(.-)%-render%s*$")
+        local address = marked and (line:match("^%s*%-%-render%-node%-override=%S*/by%-path/pci%-(.-)%-render%s*$")
+          or line:match("^%s*%-?%-?vaapi%-device%s*=%s*%S*/by%-path/pci%-(.-)%-render%s*$"))
         if address then
           local vendor = first_line(devices .. "/" .. address .. "/vendor")
           local class = first_line(devices .. "/" .. address .. "/class")
@@ -37,6 +42,7 @@ local function hybrid_video_pin_stale()
             return true
           end
         end
+        marked = line == hybrid_video_pin_marker
       end
       file:close()
     end
