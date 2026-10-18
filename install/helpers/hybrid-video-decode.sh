@@ -52,16 +52,80 @@ hybrid_video_mpv_sets() {
     ' "$HYBRID_VIDEO_MPV_CONF"
 }
 
+# Whether the user sets any of the options given anywhere mpv reads them: any
+# section of mpv.conf, and any file pulled in with include= (mpv has no conf.d
+# directory; include= is how a config is split up). Omarchy's own lines do not
+# count: the block under HYBRID_VIDEO_MPV_COMMENT and a line under the marker.
+# An include that cannot be read counts as a setting, since what it holds is
+# unknown.
+hybrid_video_mpv_user_sets() {
+  local options conf include dir found
+  local -a queue=("$HYBRID_VIDEO_MPV_CONF") seen=()
+  local -i i=0
+  options=$(IFS='|'; echo "$*")
+  dir=$(dirname "$HYBRID_VIDEO_MPV_CONF")
+
+  while (( i < ${#queue[@]} && i < 32 )); do
+    conf=${queue[i]}
+    i+=1
+    [[ " ${seen[*]} " == *" $conf "* ]] && continue
+    seen+=("$conf")
+    if [[ ! -r $conf ]]; then
+      (( i == 1 )) && continue
+      return 0
+    fi
+    found=0
+    while IFS= read -r include; do
+      if [[ $include == set ]]; then
+        found=1
+        break
+      fi
+      case $include in
+      \~\~/* | \~\~home/*) include="$dir/${include#*/}" ;;
+      \~/*) include="$HOME/${include#\~/}" ;;
+      /*) ;;
+      *) include="$dir/$include" ;;
+      esac
+      queue+=("$include")
+    done < <(awk -v options="$options" -v main=$(( i == 1 )) \
+      -v comment="$HYBRID_VIDEO_MPV_COMMENT" -v marker="$HYBRID_VIDEO_PIN_MARKER" '
+      main && $0 == comment { omarchy = 1; next }
+      omarchy && (/^[[:space:]]*$/ || /^[[:space:]]*\[/) { omarchy = 0 }
+      main && $0 == marker { held = 1; next }
+      held { held = 0; next }
+      omarchy { next }
+      {
+        line = $0
+        sub(/^[[:space:]]*/, "", line)
+        if (line ~ /^(--)?include[[:space:]]*=/) {
+          sub(/^(--)?include[[:space:]]*=[[:space:]]*/, "", line)
+          # A quoted path ends at its closing quote; any other ends at a #.
+          if (line ~ /^"[^"]*"/) line = substr(line, 2, index(substr(line, 2), "\"") - 1)
+          else if (line ~ /^\047[^\047]*\047/) line = substr(line, 2, index(substr(line, 2), "\047") - 1)
+          else { sub(/#.*/, "", line); sub(/[[:space:]]*$/, "", line) }
+          if (line != "") print line
+          next
+        }
+        sub(/#.*/, "", line)
+        if (line ~ "^(--)?(" options ")[[:space:]]*(=|$)") { print "set"; exit }
+      }' "$conf")
+    (( found )) && return 0
+  done
+  return 1
+}
+
 # Decodes through VA-API on the iGPU. hwdec=auto-safe from /etc/mpv/mpv.conf
 # can settle on NVDEC, which loads CUDA and wakes the dGPU. The options go at
-# the top of ~/.config/mpv/mpv.conf, ahead of any [profile] section, and only
-# those the user has not set. When the comment Omarchy writes above them is
+# the top of ~/.config/mpv/mpv.conf, ahead of any [profile] section. A user who
+# sets either one anywhere (see hybrid_video_mpv_user_sets) has set decode up
+# their own way, and mpv is left alone. When the comment Omarchy writes above them is
 # still there (a stale pin was dropped), they go back under it.
 hybrid_video_pin_mpv() {
   local node existing="" out
   local -a options=()
 
   node=$(omarchy-hw-igpu-render-node) || return 0
+  hybrid_video_mpv_user_sets hwdec vaapi-device && return 0
 
   hybrid_video_mpv_sets hwdec || options+=("hwdec=vaapi")
   hybrid_video_mpv_sets vaapi-device || options+=("$HYBRID_VIDEO_PIN_MARKER" "vaapi-device=$node")
