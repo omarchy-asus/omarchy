@@ -36,3 +36,24 @@ Merge conflicts between them are small and known: 3, 4 and 10 touch `bin/omarchy
 | `omarchy-settings-nvidia-powerd` | omarchy-settings: ship the nvidia-powerd start-limit drop-in | companion to `asus/nvidia-powerd-start-limit`; open it with that PR ([draft](pkgs-omarchy-settings-nvidia-powerd.md)) |
 | `omarchy-asus` | not a PR: upstream master with every companion merged in | install and test from it; rebuild after a companion changes (`git merge` each companion onto `upstream/master`) |
 | `linux-omarchy-hid-asus-winlock` | Add hid-asus Win-lock pass-through to linux-omarchy, EEVDF and MuQSS | after Jiri's review of the hid-asus patch, or two weeks after the ping ([draft](pkgs-linux-omarchy-hid-asus-winlock.md)) |
+
+## Rule: build it here before it goes upstream
+
+Every new draft, and every draft about to be promoted (opened as a pull request, posted as an issue with a patch, or a comment saying "this fixes it"), is first built into our own build and run on the GA605KM. That means the [omarchy-asus repo](https://github.com/rdoupe-omarchy/omarchy-asus-pkgs/tree/omarchy-asus-repo) packages or this fork's `quattro`, as a workaround or a fork if need be. Its draft says what the test was. Pull requests already open stay open.
+
+Not yet built here, so not ready to post:
+- the asusctl nvidia-powerd patch (`upstream/asusctl-nvidia-powerd-start-limit.patch` in the research tree, never compiled);
+- the omarchy-pkgs companions and `asus/nvidia-powerd-start-limit`, until the drop-in ships in the repo's G16 package and has survived more than five plug-ins in one boot;
+- the #15667 hardware-confirm reply, until the exact commit runs here.
+
+## Phase 2: what other ASUS projects have found
+
+Once our own fixes are shipped, go through the other Omarchy ASUS projects for the problems they solve and the hardware facts they hold, and fix each problem at the layer where it belongs: kernel, driver, firmware interface, asusd, or Omarchy's defaults. Don't port their UI: a G-Helper clone on Linux works around a Windows app's problems. A control is worth having only where there's a real choice (charge limit), and then it should be Omarchy-native.
+
+| Source | What to take | Where it belongs |
+|---|---|---|
+| G14 tools (`cashcon57/omarchy-g14-tools`) | The wake sources behind their GPU-mode switch; audio DSP and CPU power-limit values for the G14 family | Each wake source fixed at its origin (the RTX already sleeps automatically here); power limits in asus-armoury (a GA605 entry is drafted); audio as a per-model tuning |
+| Z13 setup scripts (`Cliffback/omarchy-rog-z13-setup` and forks) | Every manual setup step | Missing defaults or kernel quirks to upstream |
+| Control panels (`moneytosms/omarchy-asus`, `omarchy-rog-hub`, `omarchy-rog-control`, `omarchy-rog-helper`) | Fan, profile and charge-limit behaviour | Automatic policy (we already have it for profiles and fans); one Omarchy control for the charge limit (#13205/#15431) |
+| `Lafrid0n/omarchy-nvidia-hybrid-fix` | NVIDIA early KMS taking the display on hybrid laptops | Already #8263 (`carry/initramfs-8263`); evidence for it |
+| Speakers ([discussion #1](https://github.com/rdoupe-omarchy/omarchy-asus/discussions/1)) | Windows' Dolby volume maximizer (+6 dB) with a multiband regulator, virtualizer | `asus/g16-speaker-tuning` (unpushed): the static curve is built and barely audible; the maximizer is tabled |
