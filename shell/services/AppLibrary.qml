@@ -22,6 +22,13 @@ Item {
   // whenever the app list changes, so newly installed apps get their icon live.
   property var iconIndex: ({})
   property var pendingIconIndex: ({})
+  // When the last scan finished, so an open of a consumer can skip a scan that
+  // could not have found anything new yet.
+  property real iconIndexScannedAt: 0
+  // An app-list change that lands while a scan runs; it may have missed the
+  // change, so one more scan runs as soon as this one exits.
+  property bool iconRescanPending: false
+  readonly property int iconRefreshMinIntervalMs: 60000
 
   property int launchSerial: 0
   property int launchToplevelCount: 0
@@ -70,8 +77,14 @@ Item {
 
   // The shell may start before first-install packages have finished placing
   // their icons; consumers call this when they open so icons appear live.
+  // A scan walks every icon theme (thousands of files) and indexes each one on
+  // the GUI thread, and the menu opens far more often than icons change. Desktop
+  // entry changes still rescan straight away; an open only rescans once the
+  // last scan is a minute old.
   function refreshIcons() {
-    if (!iconIndexScan.running) iconIndexScan.running = true
+    if (iconIndexScan.running) return
+    if (Date.now() - root.iconIndexScannedAt < root.iconRefreshMinIntervalMs) return
+    iconIndexScan.running = true
   }
 
   function launch(desktopId, name) {
@@ -147,6 +160,17 @@ Item {
       root.pendingIconIndex[name] = value
   }
 
+  // The whole scan in one pass, rather than one JS callback per path.
+  function indexIconText(text) {
+    root.pendingIconIndex = ({})
+    var lines = String(text || "").split("\n")
+    for (var i = 0; i < lines.length; i++) root.indexIconLine(lines[i])
+    // Swapping the property re-evaluates every iconSource() binding, so
+    // newly found icons appear without rebuilding the list.
+    root.iconIndex = root.pendingIconIndex
+    root.iconIndexScannedAt = Date.now()
+  }
+
   function hiddenEntryScanCommand() {
     var desktop = [Quickshell.env("XDG_CURRENT_DESKTOP"), Quickshell.env("XDG_SESSION_DESKTOP"), Quickshell.env("DESKTOP_SESSION")].filter(function(v) { return String(v || "").length > 0 }).join(":")
     var script = root.omarchyPath + "/shell/services/hidden-entries.sh"
@@ -202,11 +226,15 @@ Item {
   Process {
     id: iconIndexScan
     command: ["bash", "-c", root.iconIndexScanCommand()]
-    stdout: SplitParser { onRead: function(line) { root.indexIconLine(line) } }
-    onStarted: root.pendingIconIndex = ({})
-    // Swapping the property re-evaluates every iconSource() binding, so
-    // newly found icons appear without rebuilding the list.
-    onExited: root.iconIndex = root.pendingIconIndex
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.indexIconText(text)
+    }
+    onExited: {
+      if (!root.iconRescanPending) return
+      root.iconRescanPending = false
+      iconIndexScan.running = true
+    }
   }
 
   // Coalesces bursts of app-list changes (a package install touches many
@@ -214,7 +242,10 @@ Item {
   Timer {
     id: iconIndexDebounce
     interval: 750
-    onTriggered: if (!iconIndexScan.running) iconIndexScan.running = true
+    onTriggered: {
+      if (iconIndexScan.running) root.iconRescanPending = true
+      else iconIndexScan.running = true
+    }
   }
 
   FileView {
