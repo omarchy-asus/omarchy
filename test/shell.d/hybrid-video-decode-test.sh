@@ -84,19 +84,58 @@ pass "the migration pins existing Chromium-family flags files to the iGPU, once"
   fail "the migration creates an mpv config that decodes through VA-API on the iGPU" "$(cat "$home/.config/mpv/mpv.conf")"
 pass "the migration creates an mpv config that decodes through VA-API on the iGPU, once"
 
-# A user's own choices win, and a [profile] section keeps its options.
+# A user's own choices win. A machine where decode was already set up by hand
+# keeps mpv exactly as it is when hwdec or vaapi-device is set anywhere mpv
+# reads: any [profile] of mpv.conf, or a file it pulls in with include=.
+# Chromium keeps a flags file that already names a render node.
 reset_home
 mkdir -p "$home/.config/mpv"
 printf '%s\n' '--render-node-override=/dev/dri/renderD128' >>"$home/.config/chromium-flags.conf"
-printf '%s\n' 'hwdec = auto-copy' 'volume=80' '' '[big]' 'vaapi-device=/dev/dri/renderD128' >"$home/.config/mpv/mpv.conf"
+cp "$ROOT/config/chromium-flags.conf" "$home/.config/brave-flags.conf"
+printf '%s\n' '--render-node-override=/dev/dri/renderD129' >>"$home/.config/brave-flags.conf"
+cp "$home/.config/brave-flags.conf" "$test_tmp/brave-flags.user"
+printf '%s' '--enable-features=VaapiVideoDecoder' >"$home/.config/chrome-flags.conf"
 run_migration
 
 grep -c -- '--render-node-override=' "$home/.config/chromium-flags.conf" | grep -qx 1 ||
   fail "a render node the user chose is kept" "$(cat "$home/.config/chromium-flags.conf")"
-expected=$(printf '%s\n' "$mpv_comment" "$marker" "vaapi-device=$node" '' 'hwdec = auto-copy' 'volume=80' '' '[big]' 'vaapi-device=/dev/dri/renderD128')
+cmp -s "$test_tmp/brave-flags.user" "$home/.config/brave-flags.conf" ||
+  fail "every flags file with a render node keeps it" "$(cat "$home/.config/brave-flags.conf")"
+grep -qFx -- "--render-node-override=$node" "$home/.config/chrome-flags.conf" ||
+  fail "a flags file without a render node is still pinned" "$(cat "$home/.config/chrome-flags.conf")"
+pass "Chromium flags files that name a render node are kept, the others pinned"
+
+mpv_kept() { # description, then the lines of mpv.conf
+  local description=$1
+  shift
+  mkdir -p "$home/.config/mpv"
+  printf '%s\n' "$@" >"$home/.config/mpv/mpv.conf"
+  cp "$home/.config/mpv/mpv.conf" "$test_tmp/mpv.user"
+  run_migration
+  cmp -s "$test_tmp/mpv.user" "$home/.config/mpv/mpv.conf" ||
+    fail "$description: mpv.conf is untouched" "$(cat "$home/.config/mpv/mpv.conf")"
+  pass "$description: mpv.conf is untouched"
+}
+mpv_kept "hwdec at the top, vaapi-device in a profile" 'hwdec = auto-copy' 'volume=80' '' '[big]' 'vaapi-device=/dev/dri/renderD128'
+mpv_kept "vaapi-device only in a profile" 'volume=80' '' '[igpu]' 'vaapi-device=/dev/dri/renderD129'
+mpv_kept "hwdec only in a profile, with no value" 'volume=80' '[hw]' '--hwdec'
+printf '%s\n' '[default]' 'hwdec=vaapi' >"$home/.config/mpv/decode.conf"
+mpv_kept "hwdec in a file included from the config directory" 'volume=80' 'include="~~/decode.conf"'
+printf '%s\n' 'vaapi-device=/dev/dri/renderD129' >"$test_tmp/igpu.conf"
+printf '%s\n' "include=$test_tmp/igpu.conf" >"$test_tmp/decode.conf"
+mpv_kept "vaapi-device in a nested include" 'volume=80' "--include=$test_tmp/decode.conf"
+mpv_kept "an include that cannot be read" 'volume=80' "include=$test_tmp/missing.conf"
+
+# An include without either option, and the options in comments, do not count.
+rm -rf "$home/.config/mpv"
+mkdir -p "$home/.config/mpv"
+printf '%s\n' 'volume=80' >"$home/.config/mpv/extra.conf"
+printf '%s\n' '# hwdec=nvdec' 'include=~~/extra.conf # volume' "include='$home/.config/mpv/extra.conf' # again" '[big]' 'fullscreen # vaapi-device=x' >"$home/.config/mpv/mpv.conf"
+run_migration
+expected=$(printf '%s\n' "$mpv_comment" "hwdec=vaapi" "$marker" "vaapi-device=$node" '' '# hwdec=nvdec' 'include=~~/extra.conf # volume' "include='$home/.config/mpv/extra.conf' # again" '[big]' 'fullscreen # vaapi-device=x')
 [[ $(cat "$home/.config/mpv/mpv.conf") == "$expected" ]] ||
-  fail "the mpv pin keeps the user's hwdec and lands ahead of their profiles" "$(cat "$home/.config/mpv/mpv.conf")"
-pass "settings the user already has are kept"
+  fail "an mpv.conf without decode settings is pinned ahead of its profiles" "$(cat "$home/.config/mpv/mpv.conf")"
+pass "an mpv.conf without decode settings is pinned ahead of its profiles"
 
 # Machines where the pin does not apply are left exactly as they were.
 for description in "AMD only" "NVIDIA drives the display" "No device claims boot_vga"; do
