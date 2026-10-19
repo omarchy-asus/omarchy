@@ -8,6 +8,7 @@
 # capture node (no udev database, as in a container) it falls back to asking them.
 v4l_class_path="${OMARCHY_V4L_CLASS_PATH:-/sys/class/video4linux}"
 udev_data_path="${OMARCHY_UDEV_DATA_PATH:-/run/udev/data}"
+dev_path="${OMARCHY_DEV_PATH:-/dev}"
 
 shopt -s nullglob
 nodes=("$v4l_class_path"/video*)
@@ -30,6 +31,10 @@ udev_capabilities() {
 # whose capabilities follow its producer, is left to the live query below.
 for node in "${nodes[@]}"; do
   [[ -e $node/device && -r $node/dev ]] || continue
+  # The picker lists only nodes it can open read-write, so a camera this user
+  # cannot open is no answer.
+  device="$dev_path/${node##*/}"
+  [[ -r $device && -w $device ]] || continue
   data="$udev_data_path/c$(<"$node/dev")"
   [[ -r $data && $(udev_capabilities "$data") == *:capture:* ]] && exit 0
 done

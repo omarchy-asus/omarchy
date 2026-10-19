@@ -136,7 +136,10 @@ fi
 # With udev's record available the guard answers from it and opens no device.
 udev_v4l="$tmp_dir/v4l-udev"
 udev_data="$tmp_dir/udev-data"
-mkdir -p "$udev_v4l/video0/device" "$udev_v4l/video1/device" "$udev_data"
+udev_dev="$tmp_dir/dev"
+mkdir -p "$udev_v4l/video0/device" "$udev_v4l/video1/device" "$udev_data" "$udev_dev"
+touch "$udev_dev/video0" "$udev_dev/video1"
+export OMARCHY_DEV_PATH="$udev_dev"
 echo 81:0 >"$udev_v4l/video0/dev"
 echo 81:1 >"$udev_v4l/video1/dev"
 printf '%s\n' 'E:ID_V4L_VERSION=2' 'E:ID_V4L_CAPABILITIES=:' >"$udev_data/c81:0"
@@ -164,6 +167,18 @@ OMARCHY_TEST_V4L2_LOG="$v4l2_log" OMARCHY_V4L_CLASS_PATH="$mixed_v4l" OMARCHY_UD
 [[ ! -s $v4l2_log ]] ||
   fail "webcam hardware detection opens no device when a later node's record answers" "$(cat "$v4l2_log")"
 pass "webcam hardware detection answers from a later node's record before asking any device"
+
+# A recorded capture node this user cannot open is not one the picker would list.
+rm "$udev_dev/video1"
+if OMARCHY_TEST_RAW_WEBCAM=true OMARCHY_TEST_V4L2_LOG="$v4l2_log" OMARCHY_V4L_CLASS_PATH="$udev_v4l" OMARCHY_UDEV_DATA_PATH="$udev_data" \
+  "$ROOT/bin/omarchy-hw-webcam"; then
+  fail "webcam hardware detection rejects a recorded capture node the user cannot open"
+fi
+[[ -s $v4l2_log ]] ||
+  fail "webcam hardware detection asks the devices when the recorded capture node cannot be opened"
+pass "webcam hardware detection rejects a recorded capture node the user cannot open"
+: >"$v4l2_log"
+touch "$udev_dev/video1"
 
 # v4l2loopback with exclusive_caps=1 switches between output and capture with its
 # producer, after udev recorded either, so neither record is taken as the answer.
