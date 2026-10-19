@@ -12,8 +12,14 @@
 #
 # Exits 0 stranded, 1 unlocked, 2 undetermined. The caller passes its own pid,
 # as a crash re-execs the shell in place.
+#
+# Voxtype's dictation OSD is a Quickshell that runs for the whole session and
+# never locks, so it doesn't count; otherwise no orphan would ever be recovered
+# while dictation is installed. Its config is /usr/share/voxtype/quickshell, or
+# a per-user copy under $XDG_DATA_HOME/voxtype/quickshell.
 omarchy-hyprland-session-locked || exit
 
-if pgrep -u "$UID" -x 'quickshell|qs|hyprlock' | grep -qvxF "$1"; then
+if pgrep -u "$UID" -a -x 'quickshell|qs|hyprlock' \
+  | awk -v self="$1" '$1 != self && !/\/voxtype\/quickshell\/?( |$)/ { found = 1 } END { exit !found }'; then
   exit 2
 fi
