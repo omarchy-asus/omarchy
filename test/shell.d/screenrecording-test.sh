@@ -136,7 +136,7 @@ fi
 # With udev's record available the guard answers from it and opens no device.
 udev_v4l="$tmp_dir/v4l-udev"
 udev_data="$tmp_dir/udev-data"
-mkdir -p "$udev_v4l/video0" "$udev_v4l/video1" "$udev_data"
+mkdir -p "$udev_v4l/video0/device" "$udev_v4l/video1/device" "$udev_data"
 echo 81:0 >"$udev_v4l/video0/dev"
 echo 81:1 >"$udev_v4l/video1/dev"
 printf '%s\n' 'E:ID_V4L_VERSION=2' 'E:ID_V4L_CAPABILITIES=:' >"$udev_data/c81:0"
@@ -154,7 +154,7 @@ pass "webcam hardware detection reads udev's record without opening a device"
 # send the guard to the devices: the recorded answer is enough.
 mixed_v4l="$tmp_dir/v4l-mixed"
 mixed_data="$tmp_dir/udev-mixed"
-mkdir -p "$mixed_v4l/video0" "$mixed_v4l/video1" "$mixed_data"
+mkdir -p "$mixed_v4l/video0/device" "$mixed_v4l/video1/device" "$mixed_data"
 echo 81:0 >"$mixed_v4l/video0/dev"
 echo 81:1 >"$mixed_v4l/video1/dev"
 printf '%s\n' 'E:ID_V4L_CAPABILITIES=:capture:' >"$mixed_data/c81:1"
@@ -165,12 +165,36 @@ OMARCHY_TEST_V4L2_LOG="$v4l2_log" OMARCHY_V4L_CLASS_PATH="$mixed_v4l" OMARCHY_UD
   fail "webcam hardware detection opens no device when a later node's record answers" "$(cat "$v4l2_log")"
 pass "webcam hardware detection answers from a later node's record before asking any device"
 
+# v4l2loopback with exclusive_caps=1 switches between output and capture with its
+# producer, after udev recorded either, so neither record is taken as the answer.
 printf '%s\n' 'E:ID_V4L_CAPABILITIES=:video_output:' >"$udev_data/c81:1"
-if OMARCHY_TEST_V4L2_LOG="$v4l2_log" OMARCHY_V4L_CLASS_PATH="$udev_v4l" OMARCHY_UDEV_DATA_PATH="$udev_data" \
+OMARCHY_TEST_V4L2_LOG="$v4l2_log" OMARCHY_V4L_CLASS_PATH="$udev_v4l" OMARCHY_UDEV_DATA_PATH="$udev_data" \
+  "$ROOT/bin/omarchy-hw-webcam" ||
+  fail "webcam hardware detection asks a node udev recorded as output-only, which can capture by now"
+[[ -s $v4l2_log ]] ||
+  fail "webcam hardware detection asks the devices when udev records no capture node"
+pass "webcam hardware detection asks a node udev recorded as output-only, which can capture by now"
+: >"$v4l2_log"
+
+if OMARCHY_TEST_RAW_WEBCAM=true OMARCHY_TEST_V4L2_LOG="$v4l2_log" OMARCHY_V4L_CLASS_PATH="$udev_v4l" OMARCHY_UDEV_DATA_PATH="$udev_data" \
   "$ROOT/bin/omarchy-hw-webcam"; then
-  fail "webcam hardware detection rejects nodes udev records as output-only"
+  fail "webcam hardware detection rejects nodes that are output-only both in udev and live"
 fi
-pass "webcam hardware detection rejects nodes udev records as output-only"
+pass "webcam hardware detection rejects nodes that are output-only both in udev and live"
+: >"$v4l2_log"
+
+virtual_v4l="$tmp_dir/v4l-virtual"
+mkdir -p "$virtual_v4l/video0"
+echo 81:1 >"$virtual_v4l/video0/dev"
+printf '%s\n' 'E:ID_V4L_CAPABILITIES=:capture:' >"$udev_data/c81:1"
+if OMARCHY_TEST_RAW_WEBCAM=true OMARCHY_TEST_V4L2_LOG="$v4l2_log" OMARCHY_V4L_CLASS_PATH="$virtual_v4l" OMARCHY_UDEV_DATA_PATH="$udev_data" \
+  "$ROOT/bin/omarchy-hw-webcam"; then
+  fail "webcam hardware detection asks a virtual camera udev recorded as capture, which may have stopped"
+fi
+[[ -s $v4l2_log ]] ||
+  fail "webcam hardware detection asks the devices for a node with no parent device"
+pass "webcam hardware detection asks a virtual camera udev recorded as capture, which may have stopped"
+: >"$v4l2_log"
 
 if OMARCHY_TEST_V4L2_LOG="$v4l2_log" OMARCHY_V4L_CLASS_PATH="$tmp_dir/no-v4l" "$ROOT/bin/omarchy-hw-webcam"; then
   fail "webcam hardware detection fails without any video node"
