@@ -7,8 +7,9 @@
 # Hyprland lets any client take over a held lock (misc:allow_session_lock_restore),
 # so a shell that recovers a lock it merely sees can take the live lock screen of
 # another shell, and strand it when it exits. A lock is stranded only while no
-# other Quickshell or hyprlock is running; until then the answer is undetermined,
-# so the caller keeps asking until that locker exits or it gives up.
+# other Quickshell or hyprlock is running under this Hyprland; until then the
+# answer is undetermined, so the caller keeps asking until that locker exits or
+# it gives up.
 #
 # Exits 0 stranded, 1 unlocked, 2 undetermined. The caller passes its own pid,
 # as a crash re-execs the shell in place.
@@ -35,6 +36,26 @@ is_voxtype_osd() {
   return 1
 }
 
+# A Quickshell or hyprlock under another Hyprland (a second login, a nested or
+# sandboxed desktop) can't hold this compositor's lock. hyprctl, which read the
+# lock above, picks its compositor by HYPRLAND_INSTANCE_SIGNATURE, and a process
+# started under a Hyprland inherits its signature. A locker with no signature,
+# or whose environment can't be read, still counts.
+in_other_hyprland() {
+  local var
+
+  [[ -n ${HYPRLAND_INSTANCE_SIGNATURE-} ]] || return 1
+
+  while IFS= read -r -d '' var; do
+    if [[ $var == HYPRLAND_INSTANCE_SIGNATURE=?* ]]; then
+      [[ ${var#*=} != "$HYPRLAND_INSTANCE_SIGNATURE" ]]
+      return
+    fi
+  done 2>/dev/null <"$proc_root/$1/environ"
+
+  return 1
+}
+
 while read -r pid; do
-  [[ $pid == "$1" ]] || is_voxtype_osd "$pid" || exit 2
+  [[ $pid == "$1" ]] || in_other_hyprland "$pid" || is_voxtype_osd "$pid" || exit 2
 done < <(pgrep -u "$UID" -x 'quickshell|qs|hyprlock')
