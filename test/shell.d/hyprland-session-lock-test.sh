@@ -10,6 +10,7 @@ test_tmp=$(mktemp -d)
 trap 'rm -rf "$test_tmp"' EXIT
 
 fake_bin="$test_tmp/bin"
+proc="$test_tmp/proc"
 mkdir -p "$fake_bin"
 
 cat >"$fake_bin/hyprctl" <<'SH'
@@ -30,6 +31,24 @@ printf '%s\n' $OMARCHY_TEST_LOCKERS
 SH
 chmod +x "$fake_bin"/*
 
+locker() {
+  local pid="$1"
+  shift
+
+  mkdir -p "$proc/$pid"
+  printf '%s\0' "$@" >"$proc/$pid/cmdline"
+}
+
+locker 100 quickshell -n -p /usr/share/omarchy/shell
+locker 200 quickshell -n -p /tmp/tmp.abc/omarchy/shell
+locker 201 quickshell -n -p "/data/voxtype/quickshell backup/omarchy/shell"
+locker 202 qs -p /usr/share/voxtype/quickshell-locker
+locker 300 qs -p /usr/share/voxtype/quickshell
+locker 301 qs -d -p /data/.local/share/voxtype/quickshell
+locker 302 /usr/bin/qs -p "/data/User Data/voxtype/quickshell/"
+locker 400 hyprlock
+locker 401 hyprlock -c /usr/share/voxtype/quickshell/lock.conf
+
 LOCKED=0
 UNLOCKED=1
 UNDETERMINED=2
@@ -46,6 +65,7 @@ exit_status() {
   OMARCHY_TEST_MONITORS="$monitors" \
   OMARCHY_TEST_HYPRCTL_FAILS="$hyprctl_fails" \
   OMARCHY_TEST_LOCKERS="$lockers" \
+  OMARCHY_PROC_ROOT="$proc" \
     "$ROOT/bin/$command" 100 || actual=$?
 
   printf '%s\n' "$actual"
@@ -116,4 +136,13 @@ assert_stranded 0 "$locked_monitors" "" "a lock with no locker alive is stranded
 assert_stranded 0 "$locked_monitors" "100" "the asking shell does not count as another locker"
 assert_stranded 1 "$unlocked_monitors" "" "an unlocked session is not stranded"
 assert_stranded 2 '[]' "" "a compositor that cannot say leaves it undetermined" 1
-assert_stranded 2 "$locked_monitors" "100 200" "a lock another locker may hold is left undetermined, so it is never taken"
+assert_stranded 2 "$locked_monitors" "100 200" "a lock another shell may hold is left undetermined, so it is never taken"
+assert_stranded 2 "$locked_monitors" "100 400" "a lock hyprlock may hold is left undetermined"
+assert_stranded 0 "$locked_monitors" "100 300" "voxtype's dictation OSD does not count as a locker"
+assert_stranded 2 "$locked_monitors" "300 200" "voxtype's OSD does not hide another shell"
+assert_stranded 0 "$locked_monitors" "100 301" "voxtype's OSD from the user's data directory does not count either"
+assert_stranded 0 "$locked_monitors" "100 302" "nor from a data directory with a space in it"
+assert_stranded 2 "$locked_monitors" "100 202" "a shell beside voxtype's config is still a locker"
+assert_stranded 2 "$locked_monitors" "100 201" "a shell whose path only contains voxtype's config, after a space, is still a locker"
+assert_stranded 2 "$locked_monitors" "100 401" "hyprlock is a locker whatever its arguments name"
+assert_stranded 2 "$locked_monitors" "100 500" "a locker gone before its arguments are read is still counted"
