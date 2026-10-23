@@ -65,7 +65,7 @@ if o.shell_succeeds(o.shell_quote(nvidia)) then
     -- drives the panel, though: forcing NVIDIA's VA-API or GLX on the session
     -- wakes the dGPU for every video and keeps it awake for any GLX app (the
     -- Steam client). Games ask for the dGPU themselves: DXVK picks it, and
-    -- native OpenGL games run with prime-run.
+    -- native OpenGL games run with PRIME render offload (prime-run).
     if nvidia_is_display and not o.shell_succeeds(o.shell_quote(igpu_render_node)) then
       hl.env("LIBVA_DRIVER_NAME", "nvidia")
       hl.env("__GLX_VENDOR_LIBRARY_NAME", "nvidia")
