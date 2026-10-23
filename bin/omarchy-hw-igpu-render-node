@@ -15,8 +15,8 @@
 # Zephyrus G16 GA605) present their iGPU as a non-VGA display controller (class
 # 0x0380), which has no boot_vga at all; when the NVIDIA GPU next to it reports
 # boot_vga=0, the firmware did not boot on NVIDIA, so that iGPU drives the
-# panel. omarchy-hw-nvidia-display does not read that case as a hybrid, which
-# keeps NVIDIA's GLX for OpenGL games there; only video decode moves.
+# panel. omarchy-hw-nvidia-display does not read that case as a hybrid, so
+# Hyprland asks this script before forcing NVIDIA's VA-API and GLX there.
 #
 # Read the cached sysfs IDs rather than lspci, which reads PCI config space and
 # resumes runtime-suspended GPUs.
