@@ -242,4 +242,7 @@ grep -F 'command: ["setpriv", "--pdeathsig", "TERM", "tailscale", "debug", "watc
   fail "tailscale follows the IPN bus and polls only while the panel is open"
 grep -F '_ipnRetryMs = Math.min(_ipnRetryMs * 2, 60000)' "$service_qml" >/dev/null ||
   fail "tailscale reconnects to a restarted tailscaled with backoff"
+grep -F '_statusRerun = true' "$service_qml" >/dev/null &&
+  grep -F 'if (root._statusRerun) {' "$service_qml" >/dev/null ||
+  fail "tailscale asks again for status requested while a status call runs"
 pass "tailscale follows the IPN bus and polls only while the panel is open"
