@@ -302,6 +302,21 @@ function parseAccounts(raw) {
   }
 }
 
+// `tailscale debug watch-ipn` prints each IPN bus notification as a JSON
+// object indented with tabs, one top-level field per line, closed by a "}"
+// line of its own. The bar icon shows only whether Tailscale is running or
+// needs a login, which changes with the backend State, the Prefs
+// (WantRunning, LoggedOut), a finished login, a login URL or an error. Peer,
+// netmap, health and engine updates leave the icon as it was, so they must not
+// each cost a status client. Absent fields are omitted or null.
+function ipnLineChangesStatus(line) {
+  return /^\t"(State|Prefs|LoginFinished|BrowseToURL|ErrMessage)": (?!null,?$)/.test(String(line || ""))
+}
+
+function ipnLineEndsNotify(line) {
+  return String(line || "") === "}"
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
     filterIPv4: filterIPv4,
@@ -320,6 +335,8 @@ if (typeof module !== "undefined") {
     mullvadRegionOptions: mullvadRegionOptions,
     mullvadCountryOptions: mullvadCountryOptions,
     parseStatus: parseStatus,
-    parseAccounts: parseAccounts
+    parseAccounts: parseAccounts,
+    ipnLineChangesStatus: ipnLineChangesStatus,
+    ipnLineEndsNotify: ipnLineEndsNotify
   }
 }
