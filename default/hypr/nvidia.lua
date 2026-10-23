@@ -60,14 +60,14 @@ if o.shell_succeeds(o.shell_quote(nvidia)) then
   local nvidia_is_display = o.shell_succeeds(o.shell_quote(nvidia_display))
   if o.shell_succeeds(o.shell_quote(nvidia_gsp)) then
     hl.env("NVD_BACKEND", "direct")
-    if nvidia_is_display then
-      -- An iGPU that is a non-VGA display controller (AMD Krackan) has no
-      -- boot_vga, so the display check still answers NVIDIA and GLX stays on
-      -- it for OpenGL games. Video decode belongs on that iGPU, though: forcing
-      -- NVIDIA's VA-API there wakes the dGPU for every video.
-      if not o.shell_succeeds(o.shell_quote(igpu_render_node)) then
-        hl.env("LIBVA_DRIVER_NAME", "nvidia")
-      end
+    -- An iGPU that is a non-VGA display controller (AMD Krackan) has no
+    -- boot_vga, so the display check still answers NVIDIA there. That iGPU
+    -- drives the panel, though: forcing NVIDIA's VA-API or GLX on the session
+    -- wakes the dGPU for every video and keeps it awake for any GLX app (the
+    -- Steam client). Games ask for the dGPU themselves: DXVK picks it, and
+    -- native OpenGL games run with prime-run.
+    if nvidia_is_display and not o.shell_succeeds(o.shell_quote(igpu_render_node)) then
+      hl.env("LIBVA_DRIVER_NAME", "nvidia")
       hl.env("__GLX_VENDOR_LIBRARY_NAME", "nvidia")
     end
   elseif o.shell_succeeds(o.shell_quote(nvidia_without_gsp)) then

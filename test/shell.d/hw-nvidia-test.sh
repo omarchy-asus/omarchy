@@ -61,7 +61,7 @@ AMD display with Ampere offload|0|0|1|1|direct - -|0x1002:0x15bf:0x030000:1 0x10
 Intel display with Maxwell offload|0|1|0|1|egl - -|0x8086:0x46a6:0x030000:1 0x10de:0x1340:0x030000:0
 NVIDIA display with inactive iGPU|0|0|1|0|direct nvidia nvidia|0x1002:0x15bf:0x030000:0 0x10de:0x2c02:0x030000:1
 Hybrid without boot_vga|0|0|1|0|direct nvidia nvidia|0x1002:0x15e7:0x030000 0x10de:0x2560:0x030200
-Non-VGA AMD display with Blackwell VGA offload|0|0|1|0|direct - nvidia|0x1002:0x1114:0x038000 0x10de:0x2d59:0x030000:0
+Non-VGA AMD display with Blackwell VGA offload|0|0|1|0|direct - -|0x1002:0x1114:0x038000 0x10de:0x2d59:0x030000:0
 Non-VGA AMD display with Ampere 3D offload|0|0|1|0|direct nvidia nvidia|0x1002:0x1114:0x038000 0x10de:0x25ac:0x030200
 CASES
 
@@ -90,3 +90,20 @@ for libva in nvidia ""; do
   fi
 done
 pass "the migration asks for a reboot only while the old NVIDIA override is live"
+
+# The same for __GLX_VENDOR_LIBRARY_NAME=nvidia, which Hyprland stopped setting
+# there later.
+migration=$(grep -l 'Stop forcing NVIDIA GLX on hybrids whose iGPU' "$ROOT"/migrations/*.sh)
+for glx in nvidia ""; do
+  rm -rf "$tmp_dir/home"
+  mkdir -p "$tmp_dir/home"
+  HOME="$tmp_dir/home" __GLX_VENDOR_LIBRARY_NAME=$glx bash -euo pipefail "$migration" >/dev/null
+  if [[ $glx == "nvidia" ]]; then
+    [[ -f $tmp_dir/home/.local/state/omarchy/reboot-required ]] ||
+      fail "the migration asks for a reboot while the session still forces NVIDIA GLX"
+  else
+    [[ ! -e $tmp_dir/home/.local/state/omarchy/reboot-required ]] ||
+      fail "the migration leaves a session without the NVIDIA GLX override alone"
+  fi
+done
+pass "the migration asks for a reboot only while the old NVIDIA GLX override is live"
