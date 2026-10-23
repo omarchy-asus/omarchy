@@ -204,3 +204,41 @@ assertDeepEqual(
 assertDeepEqual(tailscale.parseStatus('{'), { ok: false, unavailable: true, message: 'Status error', error: 'Failed to parse tailscale status' }, 'tailscale reports invalid status JSON')
 assertDeepEqual(tailscale.parseAccounts('{'), { accounts: [], selectedAccountId: '', selectedAccountLabel: '' }, 'tailscale handles invalid account JSON')
 JS
+
+# The bar icon needs status alone; exit nodes and accounts belong to the open
+# panel, so a background poll must not spawn their clients.
+service_qml="$ROOT/shell/plugins/panels/tailscale/Service.qml"
+panel_qml="$ROOT/shell/plugins/panels/tailscale/Panel.qml"
+grep -F 'var panelData = panelOpen || forceAccounts === true' "$service_qml" >/dev/null &&
+  grep -F 'if (panelData && !mullvadExitNodesProcess.running) {' "$service_qml" >/dev/null &&
+  grep -F 'var shouldRefreshAccounts = panelData && (' "$service_qml" >/dev/null ||
+  fail "tailscale polls exit nodes and accounts only for the open panel"
+grep -F 'onPanelOpenChanged: if (panelOpen) refresh(false, true)' "$service_qml" >/dev/null &&
+  grep -F 'panelOpen: root.opened' "$panel_qml" >/dev/null ||
+  fail "opening the tailscale panel refreshes what it shows"
+pass "tailscale polls exit nodes and accounts only for the open panel"
+
+# With the panel closed nothing polls: the bar follows `tailscale debug
+# watch-ipn` and refreshes status only for a notification that can change the
+# icon.
+run_node_test <<'JS'
+const tailscale = requireFromRoot('shell/plugins/panels/tailscale/Model.js')
+
+for (const line of ['\t"State": 6,', '\t"Prefs": {', '\t"LoginFinished": {},', '\t"BrowseToURL": "https://login.tailscale.com/a/x",', '\t"ErrMessage": "backend error"'])
+  assert(tailscale.ipnLineChangesStatus(line), 'tailscale refreshes status for ' + line.trim())
+for (const line of ['\t"ErrMessage": null,', '\t"LoginFinished": null,', '\t"State": null', '\t"Health": {', '\t"Engine": {', '\t"NetMap": {', '\t\t"State": 6,', '\t\t"WantRunning": false,', '"State": 6,', ''])
+  assert(!tailscale.ipnLineChangesStatus(line), 'tailscale leaves status alone for ' + JSON.stringify(line))
+assert(tailscale.ipnLineEndsNotify('}'), 'tailscale sees the end of an IPN notification')
+assert(!tailscale.ipnLineEndsNotify('\t}'), 'tailscale skips nested object ends')
+JS
+
+grep -F 'command: ["setpriv", "--pdeathsig", "TERM", "tailscale", "debug", "watch-ipn", "--initial"]' "$service_qml" >/dev/null &&
+  grep -F 'running: root.panelOpen' "$service_qml" >/dev/null &&
+  ! grep -F 'id: startupRamp' "$service_qml" >/dev/null ||
+  fail "tailscale follows the IPN bus and polls only while the panel is open"
+grep -F '_ipnRetryMs = Math.min(_ipnRetryMs * 2, 60000)' "$service_qml" >/dev/null ||
+  fail "tailscale reconnects to a restarted tailscaled with backoff"
+grep -F '_statusRerun = true' "$service_qml" >/dev/null &&
+  grep -F 'if (root._statusRerun) {' "$service_qml" >/dev/null ||
+  fail "tailscale asks again for status requested while a status call runs"
+pass "tailscale follows the IPN bus and polls only while the panel is open"

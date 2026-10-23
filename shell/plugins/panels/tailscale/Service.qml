@@ -42,7 +42,15 @@ Item {
   property string actionStatus: ""
   property string lastError: ""
 
+  // How often the open panel refreshes everything it shows. While the panel
+  // is closed nothing polls: the bar icon follows tailscaled's IPN bus
+  // (ipnWatchProcess) and refreshes status only when it reports a change.
   readonly property int refreshIntervalSec: intSetting("refreshIntervalSec", 30, 5, 3600)
+  // Exit nodes and accounts are only shown in the open panel, while the bar
+  // icon needs status alone. Fetch them while the panel is open rather than
+  // spawning two more tailscale clients on every status refresh.
+  property bool panelOpen: false
+  onPanelOpenChanged: if (panelOpen) refresh(false, true)
   readonly property bool busy: whichProcess.running || statusProcess.running || mullvadExitNodesProcess.running || accountsProcess.running || actionProcess.running || loginProcess.running || switchProcess.running || operatorProcess.running || exitNodeProcess.running
   readonly property string userName: Quickshell.env("USER") || Quickshell.env("LOGNAME")
 
@@ -106,6 +114,10 @@ Item {
     _exitNodesSig = sig
     exitNodes = next
   }
+  property bool _statusRerun: false
+  property bool _ipnConnected: false
+  property bool _ipnStatusChanged: false
+  property int _ipnRetryMs: 1000
 
   function setting(name, fallback) {
     var value = settings ? settings[name] : undefined
@@ -216,8 +228,14 @@ Item {
       // A full-peer request arrived while a light poll is in flight; remember
       // it so the panel is not left stale until the next periodic refresh.
       _pendingFullPeers = true
+    } else {
+      // The running call may have read the state before the change that asked
+      // for this refresh, and with the panel closed no later poll would fix
+      // it. Ask again once it is done.
+      _statusRerun = true
     }
-    if (!mullvadExitNodesProcess.running) {
+    var panelData = panelOpen || forceAccounts === true
+    if (panelData && !mullvadExitNodesProcess.running) {
       _mullvadExitNodesOutput = ""
       _mullvadExitNodesError = ""
       mullvadExitNodesProcess.command = ["tailscale", "exit-node", "list"]
@@ -225,7 +243,7 @@ Item {
       launched = true
     }
     var now = Date.now()
-    var shouldRefreshAccounts = forceAccounts === true || accounts.length === 0 || now - _lastAccountsRefreshMs > 60000
+    var shouldRefreshAccounts = panelData && (forceAccounts === true || accounts.length === 0 || now - _lastAccountsRefreshMs > 60000)
     if (shouldRefreshAccounts && !accountsProcess.running) {
       _accountsOutput = ""
       _accountsError = ""
@@ -239,6 +257,38 @@ Item {
     // process forever once the refresh interval is shorter than the timeout,
     // and refreshIntervalSec goes down to five seconds.
     if (launched && !pollWatchdog.running) pollWatchdog.start()
+  }
+
+  // One long-running `tailscale debug watch-ipn` per panel replaces the
+  // closed-panel poll. --initial makes its first notification carry the
+  // current State and Prefs, so connecting also refreshes once.
+  function startIpnWatch() {
+    if (!installed || ipnWatchProcess.running) return
+    _ipnConnected = false
+    _ipnStatusChanged = false
+    ipnWatchProcess.running = true
+  }
+
+  function handleIpnLine(line) {
+    if (!_ipnConnected) {
+      _ipnConnected = true
+      _ipnRetryMs = 1000
+    }
+    if (Model.ipnLineChangesStatus(line)) _ipnStatusChanged = true
+    else if (Model.ipnLineEndsNotify(line) && _ipnStatusChanged) {
+      _ipnStatusChanged = false
+      ipnRefreshDebounce.restart()
+    }
+  }
+
+  // The watch ends when tailscaled stops or restarts. Show what that did to
+  // the connection, then reconnect, backing off up to a minute while the
+  // daemon stays away so a stopped tailscaled costs one client a minute.
+  function ipnWatchEnded() {
+    if (_ipnConnected) refresh()
+    ipnRetryTimer.interval = _ipnRetryMs
+    ipnRetryTimer.restart()
+    _ipnRetryMs = Math.min(_ipnRetryMs * 2, 60000)
   }
 
   function elideStatus(text) {
@@ -455,29 +505,32 @@ Item {
     if (_loginInProgress && !_loginUrlOpened) openAuthUrlFrom(text, false)
   }
 
+  Component.onCompleted: refresh()
+
   Timer {
+    // Only while the panel is open; opening it refreshes at once
+    // (onPanelOpenChanged). A tailscaled that connects after the shell starts
+    // shows up on the IPN bus, so the closed bar needs no poll for it either.
     id: refreshTimer
     interval: root.refreshIntervalSec * 1000
     repeat: true
-    running: true
-    triggeredOnStart: true
+    running: root.panelOpen
     onTriggered: root.refresh()
   }
 
   Timer {
-    // After a fresh boot the startup poll usually lands before tailscaled has
-    // connected, which left the icon stale until the next periodic refresh.
-    // Poll quickly until the service shows up, or give up after ~30 seconds.
-    id: startupRamp
-    property int ticks: 0
-    interval: 2000
-    repeat: true
-    running: true
-    onTriggered: {
-      ticks += 1
-      if (root.running || ticks >= 15) startupRamp.running = false
-      else root.refresh()
-    }
+    // A state change arrives as a burst of notifications (Prefs, then each
+    // State on the way); refresh once for the lot.
+    id: ipnRefreshDebounce
+    interval: 250
+    repeat: false
+    onTriggered: root.refresh()
+  }
+
+  Timer {
+    id: ipnRetryTimer
+    repeat: false
+    onTriggered: root.startIpnWatch()
   }
 
   Timer {
@@ -529,12 +582,24 @@ Item {
     command: []
     onExited: function(exitCode) {
       root.installed = exitCode === 0
-      if (root.installed) root.refreshStatusAndAccounts()
-      else {
+      if (root.installed) {
+        root.refreshStatusAndAccounts()
+        root.startIpnWatch()
+      } else {
         root.refreshing = false
         root.resetUnavailable("Not installed")
       }
     }
+  }
+
+  Process {
+    // The pdeathsig ends the watch with the shell, however the shell exits;
+    // left behind, it would only notice at its next notification.
+    id: ipnWatchProcess
+    running: false
+    command: ["setpriv", "--pdeathsig", "TERM", "tailscale", "debug", "watch-ipn", "--initial"]
+    stdout: SplitParser { onRead: function(line) { root.handleIpnLine(line) } }
+    onExited: function(exitCode) { root.ipnWatchEnded() }
   }
 
   Process {
@@ -554,7 +619,11 @@ Item {
       }
       if (root._pendingFullPeers) {
         root._pendingFullPeers = false
+        root._statusRerun = false
         root.refreshStatusAndAccounts(false, true)
+      } else if (root._statusRerun) {
+        root._statusRerun = false
+        Qt.callLater(root.refresh)
       }
     }
   }

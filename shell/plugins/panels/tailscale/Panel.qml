@@ -441,7 +441,6 @@ Panel {
       peerList.rememberedY = 0
       peerList.positionViewAtBeginning()
     }
-    tailscale.refresh(false, true)
     Qt.callLater(function() { if (panel.loadedContent) panel.loadedContent.forceActiveFocus() })
   } else if (peerSearch && peerSearch.text !== "") {
     // A query must not survive the panel: reopening to a silently filtered
@@ -461,6 +460,9 @@ Panel {
     id: tailscale
     settings: root.settings
     peersWanted: root.opened
+    // Opening the panel refreshes everything it shows, every peer, exit nodes
+    // and accounts included; see Service.panelOpen.
+    panelOpen: root.opened
   }
 
   Connections {
