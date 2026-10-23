@@ -74,6 +74,7 @@ Item {
   property string _exitNodeError: ""
   property string _operatorOutput: ""
   property string _operatorError: ""
+  property bool _statusRerun: false
   property bool _ipnConnected: false
   property bool _ipnStatusChanged: false
   property int _ipnRetryMs: 1000
@@ -179,6 +180,11 @@ Item {
       statusProcess.command = ["tailscale", "status", "--json"]
       statusProcess.running = true
       launched = true
+    } else {
+      // The running call may have read the state before the change that asked
+      // for this refresh, and with the panel closed no later poll would fix
+      // it. Ask again once it is done.
+      _statusRerun = true
     }
     var panelData = panelOpen || forceAccounts === true
     if (panelData && !mullvadExitNodesProcess.running) {
@@ -542,6 +548,10 @@ Item {
       else {
         root.resetUnavailable("Disconnected")
         root.lastError = stderr.trim()
+      }
+      if (root._statusRerun) {
+        root._statusRerun = false
+        Qt.callLater(root.refresh)
       }
     }
   }
