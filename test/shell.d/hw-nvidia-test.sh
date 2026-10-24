@@ -49,6 +49,10 @@ local egl = env.__EGL_VENDOR_LIBRARY_FILENAMES
 egl = egl and egl:gsub("/usr/share/glvnd/egl_vendor.d/", "")
 print(table.concat({ env.NVD_BACKEND or "-", env.LIBVA_DRIVER_NAME or "-", env.__GLX_VENDOR_LIBRARY_NAME or "-",
   env.VK_LOADER_DRIVERS_DISABLE or "-", egl or "-" }, " "))
+-- The pins are named for bash and autostart.lua exactly when they are set.
+local named = env.OMARCHY_DESKTOP_GPU_PINS == "VK_LOADER_DRIVERS_DISABLE __EGL_VENDOR_LIBRARY_FILENAMES"
+  and o.desktop_gpu_pins ~= nil
+if named ~= (env.VK_LOADER_DRIVERS_DISABLE ~= nil) then print("pins named wrongly") end
 LUA
   )
   [[ $actual_env == "$expected_env" ]] || fail "$description: driver environment" "expected $expected_env, got $actual_env"
@@ -121,9 +125,9 @@ cat >"$tmp_dir/state-bin/omarchy-state" <<'SH'
 printf '%s\n' "$*" >>"$OMARCHY_TEST_STATE_LOG"
 SH
 chmod +x "$tmp_dir/state-bin/omarchy-state"
-for pinned in "" "*nvidia*"; do
+for pinned in "" "VK_LOADER_DRIVERS_DISABLE __EGL_VENDOR_LIBRARY_FILENAMES"; do
   : >"$tmp_dir/state.log"
-  PATH="$tmp_dir/state-bin:$PATH" OMARCHY_TEST_STATE_LOG="$tmp_dir/state.log" VK_LOADER_DRIVERS_DISABLE=$pinned \
+  PATH="$tmp_dir/state-bin:$PATH" OMARCHY_TEST_STATE_LOG="$tmp_dir/state.log" OMARCHY_DESKTOP_GPU_PINS=$pinned \
     bash -euo pipefail "$migration" >/dev/null
   if [[ -z $pinned ]]; then
     grep -Fxq "set reboot-required" "$tmp_dir/state.log" ||
@@ -133,3 +137,23 @@ for pinned in "" "*nvidia*"; do
   fi
 done
 pass "the GPU pin migration asks for a reboot only while the session lacks the pins"
+
+# What systemd starts (a game launcher at login) gets every GPU: autostart
+# takes the desktop's pins back out of the activation environment.
+activation=$(lua <<'LUA'
+package.path = os.getenv("ROOT") .. "/?.lua;" .. package.path
+require("default.hypr.helpers")
+local handlers, cmds = {}, {}
+hl = { env = function() end, on = function(event, fn) handlers[event] = fn end,
+  exec_cmd = function(cmd) table.insert(cmds, cmd) end }
+require("default.hypr.nvidia")
+require("default.hypr.autostart")
+handlers["hyprland.start"]()
+for _, cmd in ipairs(cmds) do
+  if cmd:match("^dbus%-update%-activation%-environment") then print(cmd) end
+end
+LUA
+)
+[[ $activation == "dbus-update-activation-environment --systemd --all && systemctl --user unset-environment VK_LOADER_DRIVERS_DISABLE __EGL_VENDOR_LIBRARY_FILENAMES" ]] ||
+  fail "autostart keeps the desktop's GPU pins out of the systemd user environment" "$activation"
+pass "autostart keeps the desktop's GPU pins out of the systemd user environment"

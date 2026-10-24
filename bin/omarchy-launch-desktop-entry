@@ -1,12 +1,14 @@
 #!/bin/bash
 
-# omarchy:summary=Launch a desktop entry, with every GPU when it prefers the discrete one
+# omarchy:summary=Launch a desktop entry, with every GPU for a game or game launcher
 # omarchy:args=<desktop-id>
 
-# Desktop entries mark apps that want the discrete GPU with
-# PrefersNonDefaultGPU=true; Steam's does. Those start through
-# omarchy-launch-all-gpus, so on a hybrid laptop they, and the games they start,
-# can still reach the NVIDIA GPU that Hyprland keeps out of other apps' way.
+# On a hybrid laptop Hyprland keeps NVIDIA's Vulkan driver and EGL vendor out of
+# the desktop (default/hypr/nvidia.lua). A game, or a launcher that starts games,
+# starts through omarchy-launch-all-gpus instead, so it and every game it starts
+# can reach the dGPU: an entry in the Game category (Steam, Heroic, Lutris and
+# most games), one that prefers the discrete GPU (PrefersNonDefaultGPU=true or
+# KDE's X-KDE-RunOnDiscreteGpu=true), or one that runs a known game runner.
 # gtk-launch resolves and runs the entry either way.
 
 if (( $# != 1 )); then
@@ -39,14 +41,28 @@ entry_file() {
 }
 
 # The first entry of that ID on the XDG data path is the one gtk-launch runs.
-prefers_non_default_gpu() {
+is_game() {
   local dir file
   local IFS=:
   for dir in "${XDG_DATA_HOME:-$HOME/.local/share}" ${XDG_DATA_DIRS:-/usr/local/share:/usr/share}; do
     file=$(entry_file "$dir/applications") || continue
     awk '
       /^\[/ { in_entry = ($0 == "[Desktop Entry]"); next }
-      in_entry && /^PrefersNonDefaultGPU[[:space:]]*=[[:space:]]*true[[:space:]]*$/ { found = 1; exit }
+      !in_entry { next }
+      /^(PrefersNonDefaultGPU|X-KDE-RunOnDiscreteGpu)[[:space:]]*=[[:space:]]*true[[:space:]]*$/ { found = 1; exit }
+      /^Categories[[:space:]]*=/ && /[=;][[:space:]]*Game[[:space:]]*(;|$)/ { found = 1; exit }
+      /^Exec[[:space:]]*=/ {
+        line = $0
+        sub(/^Exec[[:space:]]*=[[:space:]]*/, "", line)
+        n = split(line, words, /[[:space:]]+/)
+        for (i = 1; i <= n; i++) {
+          if (words[i] == "env" || words[i] ~ /^[A-Za-z_][A-Za-z0-9_]*=/) continue
+          base = words[i]; sub(/.*\//, "", base)
+          if (base ~ /^(steam|lutris|heroic|bottles|umu-run|gamescope|wine|wine64|proton)$/) found = 1
+          break
+        }
+        if (found) exit
+      }
       END { exit !found }
     ' "$file"
     return
@@ -54,7 +70,7 @@ prefers_non_default_gpu() {
   return 1
 }
 
-if prefers_non_default_gpu; then
+if is_game; then
   exec omarchy-launch-all-gpus gtk-launch "$desktop_id"
 fi
 

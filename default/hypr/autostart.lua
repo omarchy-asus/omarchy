@@ -9,7 +9,13 @@ hl.on("hyprland.start", function()
 
   -- Slow app launch fix -- set systemd and D-Bus activation vars before
   -- starting session services.
-  hl.exec_cmd("dbus-update-activation-environment --systemd --all")
+  -- The desktop's GPU pins (nvidia.lua) stay out of it, so what systemd
+  -- starts, a game launcher at login included, has every GPU.
+  local activation = "dbus-update-activation-environment --systemd --all"
+  if o.desktop_gpu_pins then
+    activation = activation .. " && systemctl --user unset-environment " .. table.concat(o.desktop_gpu_pins, " ")
+  end
+  hl.exec_cmd(activation)
 
   hl.exec_cmd("omarchy-launch-shell")
   hl.exec_cmd("omarchy-provision-first-run")

@@ -4,13 +4,13 @@
 # omarchy:args=<command> [args...]
 
 # On a hybrid laptop whose iGPU drives the display, Hyprland keeps NVIDIA's
-# Vulkan driver and EGL vendor out of the session (default/hypr/nvidia.lua): the open driver resumes the runtime-suspended dGPU
-# whenever an app merely lists GPUs. Run a game, or the launcher that starts it,
-# through this command to give it every GPU again: DXVK and other Vulkan games
-# then pick the dGPU themselves. A native OpenGL game still needs PRIME render
-# offload as well (__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia).
-# The app launcher does this by itself for desktop entries that prefer the
-# discrete GPU, such as Steam's.
+# Vulkan driver and EGL vendor out of the desktop (default/hypr/nvidia.lua): the
+# open driver resumes the runtime-suspended dGPU whenever an app merely lists
+# GPUs. Games get them back however they start: from a shell, at login, or from
+# the app launcher as a game. This runs anything else with every GPU too: DXVK
+# and other Vulkan games then pick the dGPU themselves. A native OpenGL game
+# still needs PRIME render offload as well (__NV_PRIME_RENDER_OFFLOAD=1
+# __GLX_VENDOR_LIBRARY_NAME=nvidia).
 
 if (( $# == 0 )); then
   echo "Usage: omarchy-launch-all-gpus <command> [args...]" >&2

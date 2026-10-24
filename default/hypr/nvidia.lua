@@ -76,13 +76,19 @@ if o.shell_succeeds(o.shell_quote(nvidia)) then
     -- display, any app that lists Vulkan devices or opens surfaceless EGL at
     -- startup (GTK, Chromium, Electron) woke the dGPU for about 20 seconds,
     -- whichever GPU it went on to use. Keep NVIDIA's Vulkan driver and EGL
-    -- vendor out of the session: GLVND asks every listed EGL vendor for its
-    -- devices, whatever their order. Apps whose desktop entry prefers the
-    -- discrete GPU (Steam) start from the launcher without these, as does any
-    -- command run through omarchy-launch-all-gpus, so games still find it.
+    -- vendor out of the desktop: the shell, the launcher, key bindings and the
+    -- apps they start (GLVND asks every listed EGL vendor for its devices,
+    -- whatever their order). Games get them back however they start: the
+    -- variables stay out of the systemd user environment (autostart.lua), so
+    -- a game launcher started at login has every GPU; an interactive bash
+    -- drops them (default/bash/envs); the app launcher starts game entries
+    -- without them (omarchy-launch-desktop-entry); and anything else can run
+    -- through omarchy-launch-all-gpus. OMARCHY_DESKTOP_GPU_PINS names them.
     if igpu_drives_display then
       hl.env("VK_LOADER_DRIVERS_DISABLE", "*nvidia*")
       hl.env("__EGL_VENDOR_LIBRARY_FILENAMES", "/usr/share/glvnd/egl_vendor.d/50_mesa.json")
+      hl.env("OMARCHY_DESKTOP_GPU_PINS", "VK_LOADER_DRIVERS_DISABLE __EGL_VENDOR_LIBRARY_FILENAMES")
+      o.desktop_gpu_pins = { "VK_LOADER_DRIVERS_DISABLE", "__EGL_VENDOR_LIBRARY_FILENAMES" }
     end
   elseif o.shell_succeeds(o.shell_quote(nvidia_without_gsp)) then
     hl.env("NVD_BACKEND", "egl")
