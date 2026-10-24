@@ -58,6 +58,7 @@ if o.shell_succeeds(o.shell_quote(nvidia)) then
   -- VA-API/GLX drivers globally breaks Chromium-based browsers (black video).
   -- Only apply those when NVIDIA actually drives the display.
   local nvidia_is_display = o.shell_succeeds(o.shell_quote(nvidia_display))
+  local igpu_drives_display = o.shell_succeeds(o.shell_quote(igpu_render_node))
   if o.shell_succeeds(o.shell_quote(nvidia_gsp)) then
     hl.env("NVD_BACKEND", "direct")
     -- An iGPU that is a non-VGA display controller (AMD Krackan) has no
@@ -66,10 +67,12 @@ if o.shell_succeeds(o.shell_quote(nvidia)) then
     -- wakes the dGPU for every video and keeps it awake for any GLX app (the
     -- Steam client). Games ask for the dGPU themselves: DXVK picks it, and
     -- native OpenGL games run with PRIME render offload (prime-run).
-    if nvidia_is_display and not o.shell_succeeds(o.shell_quote(igpu_render_node)) then
+    if nvidia_is_display and not igpu_drives_display then
       hl.env("LIBVA_DRIVER_NAME", "nvidia")
       hl.env("__GLX_VENDOR_LIBRARY_NAME", "nvidia")
     end
+    -- With the iGPU driving the display, NVIDIA's Vulkan driver and EGL vendor
+    -- are kept out of what Hyprland starts (desktop-gpu-pins.lua).
   elseif o.shell_succeeds(o.shell_quote(nvidia_without_gsp)) then
     hl.env("NVD_BACKEND", "egl")
     if nvidia_is_display then

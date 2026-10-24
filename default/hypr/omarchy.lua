@@ -1,6 +1,7 @@
 -- Omarchy Hyprland setup: helpers, defaults, and current theme overrides.
 
 require("default.hypr.helpers")
+require("default.hypr.desktop-gpu-pins")
 local require_optional = require("default.hypr.require_optional")
 
 -- Use Omarchy defaults, but don't edit these directly.

@@ -1,0 +1,77 @@
+#!/bin/bash
+
+# omarchy:summary=Launch a desktop entry, with every GPU for a game or game launcher
+# omarchy:args=<desktop-id>
+
+# On a hybrid laptop Hyprland keeps NVIDIA's Vulkan driver and EGL vendor out of
+# the desktop (default/hypr/desktop-gpu-pins.lua). A game, or a launcher that
+# starts games, starts through omarchy-launch-all-gpus instead, so it and every
+# game it starts can reach the dGPU: an entry in the Game category (Steam, Heroic, Lutris and
+# most games), one that prefers the discrete GPU (PrefersNonDefaultGPU=true or
+# KDE's X-KDE-RunOnDiscreteGpu=true), or one that runs a known game runner.
+# gtk-launch resolves and runs the entry either way.
+
+if (( $# != 1 )); then
+  echo "Usage: omarchy-launch-desktop-entry <desktop-id>" >&2
+  exit 1
+fi
+
+desktop_id=$1
+file_name=$desktop_id
+[[ $file_name == *.desktop ]] || file_name+=".desktop"
+
+# The entry file in one applications directory. A desktop ID names an entry in
+# a subdirectory with its path's slashes turned into dashes
+# (games/example.desktop is games-example.desktop).
+entry_file() {
+  local apps=$1 file
+  if [[ -f $apps/$file_name ]]; then
+    printf '%s\n' "$apps/$file_name"
+    return
+  fi
+  [[ $file_name == *-* && -d $apps ]] || return 1
+  while IFS= read -r -d '' file; do
+    file=${file#"$apps/"}
+    if [[ ${file//\//-} == "$file_name" ]]; then
+      printf '%s\n' "$apps/$file"
+      return
+    fi
+  done < <(find "$apps" -mindepth 2 -name '*.desktop' -print0 2>/dev/null)
+  return 1
+}
+
+# The first entry of that ID on the XDG data path is the one gtk-launch runs.
+is_game() {
+  local dir file
+  local IFS=:
+  for dir in "${XDG_DATA_HOME:-$HOME/.local/share}" ${XDG_DATA_DIRS:-/usr/local/share:/usr/share}; do
+    file=$(entry_file "$dir/applications") || continue
+    awk '
+      /^\[/ { in_entry = ($0 == "[Desktop Entry]"); next }
+      !in_entry { next }
+      /^(PrefersNonDefaultGPU|X-KDE-RunOnDiscreteGpu)[[:space:]]*=[[:space:]]*true[[:space:]]*$/ { found = 1; exit }
+      /^Categories[[:space:]]*=/ && /[=;][[:space:]]*Game[[:space:]]*(;|$)/ { found = 1; exit }
+      /^Exec[[:space:]]*=/ {
+        line = $0
+        sub(/^Exec[[:space:]]*=[[:space:]]*/, "", line)
+        n = split(line, words, /[[:space:]]+/)
+        for (i = 1; i <= n; i++) {
+          if (words[i] == "env" || words[i] ~ /^[A-Za-z_][A-Za-z0-9_]*=/) continue
+          base = words[i]; sub(/.*\//, "", base)
+          if (base ~ /^(steam|lutris|heroic|bottles|umu-run|gamescope|wine|wine64|proton)$/) found = 1
+          break
+        }
+        if (found) exit
+      }
+      END { exit !found }
+    ' "$file"
+    return
+  done
+  return 1
+}
+
+if is_game; then
+  exec omarchy-launch-all-gpus gtk-launch "$desktop_id"
+fi
+
+exec gtk-launch "$desktop_id"
