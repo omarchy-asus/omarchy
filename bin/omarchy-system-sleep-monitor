@@ -4,58 +4,132 @@
 # omarchy:group=system
 # omarchy:hidden=true
 
-consume_sleep_events() {
-  local line sleep_lock
-  sleep_lock="$OMARCHY_PATH/bin/omarchy-system-sleep-lock"
+# One process watches every suspend of the session. It holds a delay inhibitor
+# between suspends, locks when logind announces one, releases the inhibitor so
+# the suspend can go ahead, and takes a new one once logind reports the resume.
+# Exiting after each lock and leaving the restart to systemd held no inhibitor
+# until the unit came back, and logind rejects a new delay inhibitor until its
+# sleep transition is over, so that restart often failed as well.
 
-  while IFS= read -r line; do
-    if [[ $line == *"boolean true"* ]]; then
-      "$sleep_lock"
-      return 0
-    fi
-  done
-}
-
-monitor_sleep_events() {
-  local monitor_fd monitor_pid status
-
-  coproc SLEEP_EVENTS {
-    exec dbus-monitor --system \
-      "type='signal',sender='org.freedesktop.login1',interface='org.freedesktop.login1.Manager',member='PrepareForSleep'"
-  }
-  monitor_fd=${SLEEP_EVENTS[0]}
-  monitor_pid=$SLEEP_EVENTS_PID
-
-  cleanup_monitor() {
-    kill "$monitor_pid" 2>/dev/null || true
-    wait "$monitor_pid" 2>/dev/null || true
-  }
-  trap cleanup_monitor EXIT
-
-  consume_sleep_events <&"$monitor_fd"
-  status=$?
-  cleanup_monitor
-  trap - EXIT
-
-  return "$status"
-}
-
-case ${1:-} in
-  --consume)
-    consume_sleep_events
-    exit 0
-    ;;
-  --inhibited)
-    monitor_sleep_events
-    exit 0
-    ;;
-esac
-
+sleep_lock="$OMARCHY_PATH/bin/omarchy-system-sleep-lock"
 sleep_monitor="$OMARCHY_PATH/bin/omarchy-system-sleep-monitor"
 
-exec systemd-inhibit \
-  --what=sleep \
-  --mode=delay \
-  --who=Omarchy \
-  --why="Lock screen before suspend" \
-  "$sleep_monitor" --inhibited
+# The inhibitor is held for as long as systemd-inhibit's child runs. That child
+# also ends with the monitor itself, so a killed monitor never leaves logind
+# waiting on a lock nobody is going to take.
+if [[ ${1:-} == --hold ]]; then
+  printf 'held %s\n' "$$"
+  # tail -f quits once nobody reads its stdout, and the monitor stops reading.
+  exec tail --pid="$2" -f /dev/null >/dev/null 2>&1
+fi
+
+events_pid=""
+inhibit_pid=""
+holder_pid=""
+
+# Stopped before the child reported in, systemd-inhibit itself is the one to
+# end; the child then follows the monitor out.
+release_inhibitor() {
+  if [[ -n $holder_pid ]]; then
+    kill "$holder_pid" 2>/dev/null
+  elif [[ -n $inhibit_pid ]]; then
+    kill "$inhibit_pid" 2>/dev/null
+  fi
+  [[ -n $inhibit_pid ]] && wait "$inhibit_pid" 2>/dev/null
+  holder_pid=""
+  inhibit_pid=""
+}
+
+# logind answers "already running" while a sleep transition is in progress:
+# the monitor started during one, or the resume is not quite done. Its
+# PrepareForSleep(false) ends the transition and takes the inhibitor again, so
+# that is not an error. Anything else is, and systemd restarts the monitor.
+take_inhibitor() {
+  local line reply inhibit_fd
+
+  [[ -n $holder_pid ]] && return 0
+
+  for _ in {1..8}; do
+    exec {inhibit_fd}< <(
+      exec systemd-inhibit \
+        --what=sleep \
+        --mode=delay \
+        --who=Omarchy \
+        --why="Lock screen before suspend" \
+        "$sleep_monitor" --hold "$$" 2>&1
+    )
+    inhibit_pid=$!
+
+    # Everything before the child's report, or instead of it, is the reason
+    # systemd-inhibit gave.
+    reply=""
+    while IFS= read -r line <&"$inhibit_fd"; do
+      if [[ $line == "held "* ]]; then
+        holder_pid=${line#held }
+        break
+      fi
+      reply+="${reply:+ }$line"
+    done
+    exec {inhibit_fd}<&-
+
+    [[ -n $holder_pid ]] && return 0
+
+    wait "$inhibit_pid" 2>/dev/null
+    inhibit_pid=""
+
+    if [[ $reply != *"already running"* ]]; then
+      printf 'omarchy-system-sleep-monitor: %s\n' "${reply:-systemd-inhibit failed}" >&2
+      return 1
+    fi
+
+    sleep 0.25
+  done
+
+  return 0
+}
+
+stop_monitor() {
+  release_inhibitor
+  if [[ -n $events_pid ]]; then
+    kill "$events_pid" 2>/dev/null
+    wait "$events_pid" 2>/dev/null
+  fi
+  events_pid=""
+}
+
+# Die by the signal itself: systemd counts exit 143 as a failed stop.
+stop_on_signal() {
+  stop_monitor
+  trap - "$1" EXIT
+  kill -"$1" $$
+}
+trap 'stop_on_signal TERM' TERM
+trap 'stop_on_signal INT' INT
+trap stop_monitor EXIT
+
+exec {events_fd}< <(
+  exec dbus-monitor --system \
+    "type='signal',sender='org.freedesktop.login1',interface='org.freedesktop.login1.Manager',member='PrepareForSleep'"
+)
+events_pid=$!
+
+# dbus-monitor prints its own NameAcquired once its match is in place. Taking
+# the inhibitor before then could hold up a suspend whose signal it never sees.
+IFS= read -r -t 5 _ <&"$events_fd"
+
+take_inhibitor || exit 1
+
+while IFS= read -r line <&"$events_fd"; do
+  case $line in
+    *"boolean true"*)
+      "$sleep_lock"
+      release_inhibitor
+      ;;
+    *"boolean false"*)
+      take_inhibitor || exit 1
+      ;;
+  esac
+done
+
+# dbus-monitor lost the system bus; a fresh monitor subscribes again.
+exit 1
