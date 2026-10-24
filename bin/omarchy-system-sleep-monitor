@@ -14,78 +14,85 @@
 sleep_lock="$OMARCHY_PATH/bin/omarchy-system-sleep-lock"
 sleep_monitor="$OMARCHY_PATH/bin/omarchy-system-sleep-monitor"
 
-# The inhibitor is held for as long as systemd-inhibit's child runs. That child
-# also ends with the monitor itself, so a killed monitor never leaves logind
-# waiting on a lock nobody is going to take.
+# Run by systemd-inhibit: the inhibitor lasts until this child's stdin closes.
+# The monitor holds the other end, so releasing it and the monitor ending in
+# any way both end the hold, without anything polling.
 if [[ ${1:-} == --hold ]]; then
-  printf 'held %s\n' "$$"
-  # tail -f quits once nobody reads its stdout, and the monitor stops reading.
-  exec tail --pid="$2" -f /dev/null >/dev/null 2>&1
+  printf 'held %s\n' "$2"
+  exec cat >/dev/null
 fi
 
-events_pid=""
-inhibit_pid=""
-holder_pid=""
+# Everything the monitor reacts to arrives as lines on one FIFO: logind's
+# PrepareForSleep from dbus-monitor, and each inhibitor's start and end. A
+# single blocking read then sees an inhibitor that dies as soon as it dies.
+# The writers inherit the descriptor, so the FIFO is unlinked at once and
+# nothing is left behind however the monitor ends.
+stream_dir=$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/omarchy-sleep-monitor.XXXXXX") || exit 1
+mkfifo "$stream_dir/events" && exec {stream_fd}<>"$stream_dir/events"
+status=$?
+rm -rf "$stream_dir"
+((status == 0)) || exit 1
 
-# Stopped before the child reported in, systemd-inhibit itself is the one to
-# end; the child then follows the monitor out.
-release_inhibitor() {
-  if [[ -n $holder_pid ]]; then
-    kill "$holder_pid" 2>/dev/null
-  elif [[ -n $inhibit_pid ]]; then
-    kill "$inhibit_pid" 2>/dev/null
-  fi
-  [[ -n $inhibit_pid ]] && wait "$inhibit_pid" 2>/dev/null
-  holder_pid=""
-  inhibit_pid=""
+events_pid=""
+hold_fd=""   # write end of the current holder's stdin; empty: no inhibitor
+holding=false # the current holder reported in, so logind granted it
+gen=0        # tells the current holder's lines from those of released ones
+retries=0
+
+start_events() {
+  (
+    dbus-monitor --system \
+      "type='signal',sender='org.freedesktop.login1',interface='org.freedesktop.login1.Manager',member='PrepareForSleep'" &
+    trap 'kill "$!" 2>/dev/null' TERM
+    wait "$!"
+    echo "events-ended"
+  ) >&"$stream_fd" &
+  events_pid=$!
 }
 
-# logind answers "already running" while a sleep transition is in progress:
-# the monitor started during one, or the resume is not quite done. Its
-# PrepareForSleep(false) ends the transition and takes the inhibitor again, so
-# that is not an error. Anything else is, and systemd restarts the monitor.
+release_inhibitor() {
+  [[ -n $hold_fd ]] && exec {hold_fd}>&-
+  hold_fd=""
+  holding=false
+}
+
 take_inhibitor() {
-  local line reply inhibit_fd
+  release_inhibitor
+  gen=$((gen + 1))
+  exec {hold_fd}> >(
+    reason=$(systemd-inhibit \
+      --what=sleep \
+      --mode=delay \
+      --who=Omarchy \
+      --why="Lock screen before suspend" \
+      "$sleep_monitor" --hold "$gen" 2>&1 >&"$stream_fd")
+    printf 'inhibitor-ended %s %s\n' "$gen" "${reason//$'\n'/ }" >&"$stream_fd"
+  )
+}
 
-  [[ -n $holder_pid ]] && return 0
+# The current inhibitor ended without being released.
+inhibitor_ended() {
+  local reason=${1# } was_holding=$holding
 
-  for _ in {1..8}; do
-    exec {inhibit_fd}< <(
-      exec systemd-inhibit \
-        --what=sleep \
-        --mode=delay \
-        --who=Omarchy \
-        --why="Lock screen before suspend" \
-        "$sleep_monitor" --hold "$$" 2>&1
-    )
-    inhibit_pid=$!
+  release_inhibitor
 
-    # Everything before the child's report, or instead of it, is the reason
-    # systemd-inhibit gave.
-    reply=""
-    while IFS= read -r line <&"$inhibit_fd"; do
-      if [[ $line == "held "* ]]; then
-        holder_pid=${line#held }
-        break
-      fi
-      reply+="${reply:+ }$line"
-    done
-    exec {inhibit_fd}<&-
-
-    [[ -n $holder_pid ]] && return 0
-
-    wait "$inhibit_pid" 2>/dev/null
-    inhibit_pid=""
-
-    if [[ $reply != *"already running"* ]]; then
-      printf 'omarchy-system-sleep-monitor: %s\n' "${reply:-systemd-inhibit failed}" >&2
-      return 1
+  # logind answers "already running" while a sleep transition is in progress:
+  # the monitor started during one, or the resume is not quite done. Retry
+  # briefly; after that the resume's PrepareForSleep(false) takes it.
+  if [[ $reason == *"already running"* ]]; then
+    if ((++retries <= 8)); then
+      sleep 0.25
+      take_inhibitor
     fi
-
-    sleep 0.25
-  done
-
-  return 0
+  elif $was_holding; then
+    # Killed, or crashed, under a monitor that is still fine: take it again.
+    printf 'omarchy-system-sleep-monitor: the inhibitor ended; taking a new one\n' >&2
+    sleep 1
+    take_inhibitor
+  else
+    printf 'omarchy-system-sleep-monitor: %s\n' "${reason:-systemd-inhibit failed}" >&2
+    exit 1
+  fi
 }
 
 stop_monitor() {
@@ -107,29 +114,42 @@ trap 'stop_on_signal TERM' TERM
 trap 'stop_on_signal INT' INT
 trap stop_monitor EXIT
 
-exec {events_fd}< <(
-  exec dbus-monitor --system \
-    "type='signal',sender='org.freedesktop.login1',interface='org.freedesktop.login1.Manager',member='PrepareForSleep'"
-)
-events_pid=$!
+start_events
 
-# dbus-monitor prints its own NameAcquired once its match is in place. Taking
-# the inhibitor before then could hold up a suspend whose signal it never sees.
-IFS= read -r -t 5 _ <&"$events_fd"
+# dbus-monitor prints its own NameAcquired once its match is in place. An
+# inhibitor taken before then could hold up a suspend whose signal it never
+# sees, so without that line there is no inhibitor: systemd starts again.
+if ! IFS= read -r -t 5 line <&"$stream_fd" || [[ $line == events-ended ]]; then
+  printf 'omarchy-system-sleep-monitor: dbus-monitor did not subscribe to PrepareForSleep\n' >&2
+  exit 1
+fi
 
-take_inhibitor || exit 1
+take_inhibitor
 
-while IFS= read -r line <&"$events_fd"; do
+while IFS= read -r line <&"$stream_fd"; do
   case $line in
     *"boolean true"*)
-      "$sleep_lock"
+      # Without the holder's pipe: the inhibitor must end with the monitor.
+      "$sleep_lock" {hold_fd}>&-
       release_inhibitor
       ;;
     *"boolean false"*)
-      take_inhibitor || exit 1
+      retries=0
+      [[ -n $hold_fd ]] || take_inhibitor
+      ;;
+    "held $gen")
+      [[ -n $hold_fd ]] && holding=true
+      retries=0
+      ;;
+    "inhibitor-ended $gen" | "inhibitor-ended $gen "*)
+      # A released inhibitor's end is expected.
+      [[ -n $hold_fd ]] && inhibitor_ended "${line#"inhibitor-ended $gen"}"
+      ;;
+    events-ended)
+      # dbus-monitor lost the system bus; a fresh monitor subscribes again.
+      exit 1
       ;;
   esac
 done
 
-# dbus-monitor lost the system bus; a fresh monitor subscribes again.
 exit 1
