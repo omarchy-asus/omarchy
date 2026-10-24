@@ -102,8 +102,8 @@ Item {
     // Start gtk-launch inside a scope under app-graphical.slice so apps do not
     // inherit wayland-wm@.service. Keeping gtk-launch as the desktop-entry
     // resolver supports IDs with spaces and entries that UWSM rejects.
-    // omarchy-launch-desktop-entry runs it, giving an app that prefers the
-    // discrete GPU every GPU on a hybrid laptop.
+    // omarchy-launch-desktop-entry runs it, giving a game or game launcher
+    // every GPU on a hybrid laptop.
     // Keep the .desktop suffix or ids like org.telegram.desktop won't resolve.
     Util.execDetached("uwsm-app -- omarchy-launch-desktop-entry " + Util.shellQuote(id + ".desktop"))
   }
