@@ -223,6 +223,7 @@ local buttons = {}
 local config = { ["input.follow_mouse"] = 1, ["decoration.shadow.enabled"] = false }
 local rules = {}
 local placed = {}
+local timeouts = {}
 local active = { id = 1 }
 local titlebars_installed = os.getenv("TITLEBARS_INSTALLED") == "1"
 
@@ -321,7 +322,10 @@ hl = {
     subscriptions[event] = subscriptions[event] or {}
     table.insert(subscriptions[event], callback)
   end,
-  timer = function(callback) callback() end,
+  timer = function(callback, options)
+    table.insert(timeouts, options and options.timeout)
+    callback()
+  end,
   get_loaded_plugins = function()
     return os.getenv("HYPRBARS_RESIDENT") == "1" and { { name = "hyprbars" } } or {}
   end,
@@ -363,6 +367,7 @@ function state()
     rules = rules,
     placed = placed,
     subscriptions = subscriptions,
+    timeouts = timeouts,
     active = active,
   }
 end
@@ -669,6 +674,24 @@ assert(not moving.floating, "a window carried to a tiled workspace kept floating
   fail "the mode leaves windows on their way to a special workspace alone"
 fi
 pass "the mode leaves windows on their way to a special workspace alone"
+
+# A window moved to a floating workspace is floated once its app has caught up
+# with the move: a move to a monitor of another scale loses a size sent sooner.
+printf 'o.workspace_mode({ workspace = "1", mode = "floating" })\n' >"$modes_dir/1.lua"
+if ! run_lua '
+local moving = window("0x1", 2)
+require("default.hypr.workspace-layouts")
+local moved = state().subscriptions["window.move_to_workspace"][1]
+local before = #state().timeouts
+
+moved(moving, { id = 1 })
+assert(moving.floating, "a window moved to a floating workspace was not floated")
+local waited = state().timeouts[before + 1]
+assert(waited and waited >= 50, "the move was arranged after " .. tostring(waited) .. " ms, too soon for a change of scale")
+'; then
+  fail "a window moved to a floating workspace is floated after its app catches up"
+fi
+pass "a window moved to a floating workspace is floated after its app catches up"
 
 # Titlebars: asked for only when installed, and themed once loaded.
 if ! run_lua '

@@ -354,11 +354,15 @@ local function watch()
   end)
 
   -- A move is still being committed when this fires, and changing the window's
-  -- floating state underneath it loses the move. Let it land first.
+  -- floating state underneath it loses the move. Let it land first. A move to
+  -- a monitor of another scale also has the app redraw at the new scale, and a
+  -- floating size sent before it has done so is lost: the window keeps drawing
+  -- at its old size inside the new frame. 1 ms and 16 ms both lose it; 50 ms
+  -- does not, so wait twice that.
   hl.on("window.move_to_workspace", function(window, workspace)
     hl.timer(function()
       arrange({ window }, workspace)
-    end, { type = "oneshot", timeout = 1 })
+    end, { type = "oneshot", timeout = 100 })
   end)
 
   -- A fullscreen window is left as it is, so it is arranged once it comes back
