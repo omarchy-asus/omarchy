@@ -60,13 +60,14 @@ wait_for_launch() {
 assert_detached_installer_launch() {
   local script="$1"
   local desktop_id="$2"
+  local launcher="${3:-gtk-launch}"
 
   : >"$OMARCHY_TEST_LOG"
   bash "$ROOT/bin/$script"
 
-  wait_for_launch "launch:uwsm-app -- gtk-launch $desktop_id" ||
-    fail "$script launches its desktop entry through gtk-launch in a UWSM scope"
-  grep -Fqx "setsid uwsm-app -- gtk-launch $desktop_id >/dev/null 2>&1 &" "$ROOT/bin/$script" ||
+  wait_for_launch "launch:uwsm-app -- $launcher $desktop_id" ||
+    fail "$script launches its desktop entry through $launcher in a UWSM scope"
+  grep -Fqx "setsid uwsm-app -- $launcher $desktop_id >/dev/null 2>&1 &" "$ROOT/bin/$script" ||
     fail "$script detaches its scoped desktop-entry launch"
   pass "$script detaches its scoped desktop-entry launch"
 }
@@ -75,7 +76,8 @@ assert_detached_installer_launch omarchy-install-editor-emacs emacsclient
 assert_detached_installer_launch omarchy-install-editor-vscode code
 assert_detached_installer_launch omarchy-install-editor-zed dev.zed.Zed
 assert_detached_installer_launch omarchy-install-gaming-heroic heroic
-assert_detached_installer_launch omarchy-install-gaming-steam steam
+# Steam prefers the discrete GPU, which a hybrid laptop hides from plain launches.
+assert_detached_installer_launch omarchy-install-gaming-steam steam omarchy-launch-desktop-entry
 
 bash "$ROOT/bin/omarchy-install-and-launch" "Example App" "alpha beta" "Disk Usage"
 presentation_command=$(<"$OMARCHY_TEST_PRESENTATION")

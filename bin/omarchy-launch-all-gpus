@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# omarchy:summary=Run a command that can use the NVIDIA GPU of a hybrid laptop, for games and their launchers
+# omarchy:args=<command> [args...]
+
+# On a hybrid laptop whose iGPU drives the display, Hyprland keeps NVIDIA's
+# Vulkan driver out of the session and tries Mesa's EGL first
+# (default/hypr/nvidia.lua): the open driver resumes the runtime-suspended dGPU
+# whenever an app merely lists GPUs. Run a game, or the launcher that starts it,
+# through this command to give it every GPU again: DXVK and other Vulkan games
+# then pick the dGPU themselves. A native OpenGL game still needs PRIME render
+# offload as well (__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia).
+# The app launcher does this by itself for desktop entries that prefer the
+# discrete GPU, such as Steam's.
+
+if (( $# == 0 )); then
+  echo "Usage: omarchy-launch-all-gpus <command> [args...]" >&2
+  exit 1
+fi
+
+exec env -u VK_LOADER_DRIVERS_DISABLE -u __EGL_VENDOR_LIBRARY_FILENAMES "$@"

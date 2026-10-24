@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# omarchy:summary=Launch a desktop entry, with every GPU when it prefers the discrete one
+# omarchy:args=<desktop-id>
+
+# Desktop entries mark apps that want the discrete GPU with
+# PrefersNonDefaultGPU=true; Steam's does. Those start through
+# omarchy-launch-all-gpus, so on a hybrid laptop they, and the games they start,
+# can still reach the NVIDIA GPU that Hyprland keeps out of other apps' way.
+# gtk-launch resolves and runs the entry either way.
+
+if (( $# != 1 )); then
+  echo "Usage: omarchy-launch-desktop-entry <desktop-id>" >&2
+  exit 1
+fi
+
+desktop_id=$1
+file_name=$desktop_id
+[[ $file_name == *.desktop ]] || file_name+=".desktop"
+
+# The first entry of that name on the XDG data path is the one gtk-launch runs.
+prefers_non_default_gpu() {
+  local dir file
+  local IFS=:
+  for dir in "${XDG_DATA_HOME:-$HOME/.local/share}" ${XDG_DATA_DIRS:-/usr/local/share:/usr/share}; do
+    file="$dir/applications/$file_name"
+    [[ -f $file ]] || continue
+    awk '
+      /^\[/ { in_entry = ($0 == "[Desktop Entry]"); next }
+      in_entry && /^PrefersNonDefaultGPU[[:space:]]*=[[:space:]]*true[[:space:]]*$/ { found = 1; exit }
+      END { exit !found }
+    ' "$file"
+    return
+  done
+  return 1
+}
+
+if prefers_non_default_gpu; then
+  exec omarchy-launch-all-gpus gtk-launch "$desktop_id"
+fi
+
+exec gtk-launch "$desktop_id"

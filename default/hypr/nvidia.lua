@@ -58,6 +58,7 @@ if o.shell_succeeds(o.shell_quote(nvidia)) then
   -- VA-API/GLX drivers globally breaks Chromium-based browsers (black video).
   -- Only apply those when NVIDIA actually drives the display.
   local nvidia_is_display = o.shell_succeeds(o.shell_quote(nvidia_display))
+  local igpu_drives_display = o.shell_succeeds(o.shell_quote(igpu_render_node))
   if o.shell_succeeds(o.shell_quote(nvidia_gsp)) then
     hl.env("NVD_BACKEND", "direct")
     -- An iGPU that is a non-VGA display controller (AMD Krackan) has no
@@ -66,9 +67,22 @@ if o.shell_succeeds(o.shell_quote(nvidia)) then
     -- wakes the dGPU for every video and keeps it awake for any GLX app (the
     -- Steam client). Games ask for the dGPU themselves: DXVK picks it, and
     -- native OpenGL games run with PRIME render offload (prime-run).
-    if nvidia_is_display and not o.shell_succeeds(o.shell_quote(igpu_render_node)) then
+    if nvidia_is_display and not igpu_drives_display then
       hl.env("LIBVA_DRIVER_NAME", "nvidia")
       hl.env("__GLX_VENDOR_LIBRARY_NAME", "nvidia")
+    end
+    -- The open driver resumes a runtime-suspended GPU for every call into it,
+    -- even one that only asks which GPUs exist. With the iGPU driving the
+    -- display, any app that lists Vulkan devices or opens surfaceless EGL at
+    -- startup (GTK, Chromium, Electron) woke the dGPU for about 20 seconds,
+    -- whichever GPU it went on to use. Keep NVIDIA's Vulkan driver out of the
+    -- session and try Mesa's EGL first. Apps whose desktop entry prefers the
+    -- discrete GPU (Steam) start from the launcher without these, as does any
+    -- command run through omarchy-launch-all-gpus, so games still find it.
+    if igpu_drives_display then
+      local egl_vendors = "/usr/share/glvnd/egl_vendor.d/"
+      hl.env("VK_LOADER_DRIVERS_DISABLE", "*nvidia*")
+      hl.env("__EGL_VENDOR_LIBRARY_FILENAMES", egl_vendors .. "50_mesa.json:" .. egl_vendors .. "10_nvidia.json")
     end
   elseif o.shell_succeeds(o.shell_quote(nvidia_without_gsp)) then
     hl.env("NVD_BACKEND", "egl")

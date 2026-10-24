@@ -12,7 +12,8 @@ export OMARCHY_PCI_DEVICES_PATH="$tmp_dir/devices" OMARCHY_DRM_PATH="$tmp_dir/dr
 export HOME="$tmp_dir/home"
 mkdir -p "$HOME"
 
-# Exit statuses, expected NVD_BACKEND/LIBVA/GLX values, then vendor:device:class[:boot_vga].
+# Exit statuses, expected NVD_BACKEND/LIBVA/GLX/Vulkan-disable/EGL-vendors values, then
+# vendor:device:class[:boot_vga].
 while IFS='|' read -r description nvidia gsp without_gsp display expected_env devices; do
   rm -rf "$tmp_dir/devices" "$tmp_dir/by-path"
   mkdir -p "$tmp_dir/devices" "$tmp_dir/by-path"
@@ -44,25 +45,28 @@ require("default.hypr.helpers")
 local env = {}
 hl = { env = function(key, value) env[key] = value end }
 require("default.hypr.nvidia")
-print(table.concat({ env.NVD_BACKEND or "-", env.LIBVA_DRIVER_NAME or "-", env.__GLX_VENDOR_LIBRARY_NAME or "-" }, " "))
+local egl = env.__EGL_VENDOR_LIBRARY_FILENAMES
+egl = egl and egl:gsub("/usr/share/glvnd/egl_vendor.d/", "")
+print(table.concat({ env.NVD_BACKEND or "-", env.LIBVA_DRIVER_NAME or "-", env.__GLX_VENDOR_LIBRARY_NAME or "-",
+  env.VK_LOADER_DRIVERS_DISABLE or "-", egl or "-" }, " "))
 LUA
   )
   [[ $actual_env == "$expected_env" ]] || fail "$description: driver environment" "expected $expected_env, got $actual_env"
   pass "$description"
 done <<'CASES'
-AMD only|1|1|1|1|- - -|0x1002:0x15e7:0x030000:1
-NVIDIA audio only|1|1|1|0|- - -|0x10de:0x228e:0x040300
-No PCI devices|1|1|1|0|- - -|
-Turing (first GSP)|0|0|1|0|direct nvidia nvidia|0x10de:0x1f91:0x030000
-Volta (last without GSP)|0|1|0|0|egl - nvidia|0x10de:0x1d81:0x030000
-Maxwell (first 580xx)|0|1|0|0|egl - nvidia|0x10de:0x1340:0x030000
-Kepler (unsupported)|0|1|1|0|- - -|0x10de:0x1004:0x030000
-AMD display with Ampere offload|0|0|1|1|direct - -|0x1002:0x15bf:0x030000:1 0x10de:0x25ac:0x030200:0
-Intel display with Maxwell offload|0|1|0|1|egl - -|0x8086:0x46a6:0x030000:1 0x10de:0x1340:0x030000:0
-NVIDIA display with inactive iGPU|0|0|1|0|direct nvidia nvidia|0x1002:0x15bf:0x030000:0 0x10de:0x2c02:0x030000:1
-Hybrid without boot_vga|0|0|1|0|direct nvidia nvidia|0x1002:0x15e7:0x030000 0x10de:0x2560:0x030200
-Non-VGA AMD display with Blackwell VGA offload|0|0|1|0|direct - -|0x1002:0x1114:0x038000 0x10de:0x2d59:0x030000:0
-Non-VGA AMD display with Ampere 3D offload|0|0|1|0|direct nvidia nvidia|0x1002:0x1114:0x038000 0x10de:0x25ac:0x030200
+AMD only|1|1|1|1|- - - - -|0x1002:0x15e7:0x030000:1
+NVIDIA audio only|1|1|1|0|- - - - -|0x10de:0x228e:0x040300
+No PCI devices|1|1|1|0|- - - - -|
+Turing (first GSP)|0|0|1|0|direct nvidia nvidia - -|0x10de:0x1f91:0x030000
+Volta (last without GSP)|0|1|0|0|egl - nvidia - -|0x10de:0x1d81:0x030000
+Maxwell (first 580xx)|0|1|0|0|egl - nvidia - -|0x10de:0x1340:0x030000
+Kepler (unsupported)|0|1|1|0|- - - - -|0x10de:0x1004:0x030000
+AMD display with Ampere offload|0|0|1|1|direct - - *nvidia* 50_mesa.json:10_nvidia.json|0x1002:0x15bf:0x030000:1 0x10de:0x25ac:0x030200:0
+Intel display with Maxwell offload|0|1|0|1|egl - - - -|0x8086:0x46a6:0x030000:1 0x10de:0x1340:0x030000:0
+NVIDIA display with inactive iGPU|0|0|1|0|direct nvidia nvidia - -|0x1002:0x15bf:0x030000:0 0x10de:0x2c02:0x030000:1
+Hybrid without boot_vga|0|0|1|0|direct nvidia nvidia - -|0x1002:0x15e7:0x030000 0x10de:0x2560:0x030200
+Non-VGA AMD display with Blackwell VGA offload|0|0|1|0|direct - - *nvidia* 50_mesa.json:10_nvidia.json|0x1002:0x1114:0x038000 0x10de:0x2d59:0x030000:0
+Non-VGA AMD display with Ampere 3D offload|0|0|1|0|direct nvidia nvidia - -|0x1002:0x1114:0x038000 0x10de:0x25ac:0x030200
 CASES
 
 # A session started before this change still carries LIBVA_DRIVER_NAME=nvidia
@@ -107,3 +111,25 @@ for glx in nvidia ""; do
   fi
 done
 pass "the migration asks for a reboot only while the old NVIDIA GLX override is live"
+
+# A session started before the GPU pins doesn't carry them yet.
+migration=$(grep -l 'Keep the NVIDIA GPU asleep while apps start' "$ROOT"/migrations/*.sh)
+printf '0x2d59\n' >"$tmp_dir/devices/0000:64:00.0/device"
+mkdir -p "$tmp_dir/state-bin"
+cat >"$tmp_dir/state-bin/omarchy-state" <<'SH'
+#!/bin/bash
+printf '%s\n' "$*" >>"$OMARCHY_TEST_STATE_LOG"
+SH
+chmod +x "$tmp_dir/state-bin/omarchy-state"
+for pinned in "" "*nvidia*"; do
+  : >"$tmp_dir/state.log"
+  PATH="$tmp_dir/state-bin:$PATH" OMARCHY_TEST_STATE_LOG="$tmp_dir/state.log" VK_LOADER_DRIVERS_DISABLE=$pinned \
+    bash -euo pipefail "$migration" >/dev/null
+  if [[ -z $pinned ]]; then
+    grep -Fxq "set reboot-required" "$tmp_dir/state.log" ||
+      fail "the GPU pin migration asks for a reboot while the session lacks the pins"
+  elif [[ -s $tmp_dir/state.log ]]; then
+    fail "the GPU pin migration leaves a pinned session alone"
+  fi
+done
+pass "the GPU pin migration asks for a reboot only while the session lacks the pins"
