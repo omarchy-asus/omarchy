@@ -130,7 +130,12 @@ while IFS= read -r line <&"$stream_fd"; do
   case $line in
     *"boolean true"*)
       # Without the holder's pipe: the inhibitor must end with the monitor.
-      "$sleep_lock" {hold_fd}>&-
+      # Lock all the same when there is none (logind is mid-transition).
+      if [[ -n $hold_fd ]]; then
+        "$sleep_lock" {hold_fd}>&-
+      else
+        "$sleep_lock"
+      fi
       release_inhibitor
       ;;
     *"boolean false"*)

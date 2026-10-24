@@ -227,6 +227,11 @@ sleep 2.5
 running "$monitor_pid" ||
   fail "sleep monitor keeps running when logind is mid-transition" "$(<"$tmpdir/monitor-stderr")"
 inhibitor_count_is 0 || fail "sleep monitor holds no inhibitor logind rejected"
+send_event true
+wait_for lock_count_is 1 || fail "sleep monitor locks for a sleep event while it holds no inhibitor"
+running "$monitor_pid" ||
+  fail "sleep monitor keeps running after locking without an inhibitor" "$(<"$tmpdir/monitor-stderr")"
+pass "sleep monitor locks for a sleep event while it holds no inhibitor"
 rm -f "$inhibit_reject"
 send_event false
 wait_for holding || fail "sleep monitor takes the inhibitor once the transition ends"
