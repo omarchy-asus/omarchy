@@ -46,6 +46,14 @@ Name=Game
 PrefersNonDefaultGPU=false
 DESKTOP
 
+# An entry in a subdirectory has the path's slashes as dashes in its ID.
+mkdir -p "$test_tmp/share/applications/games"
+cat >"$test_tmp/share/applications/games/example.desktop" <<'DESKTOP'
+[Desktop Entry]
+Name=Nested game
+PrefersNonDefaultGPU=true
+DESKTOP
+
 launch() {
   HOME="$test_tmp/home" XDG_DATA_HOME="" XDG_DATA_DIRS="$test_tmp/share" PATH="$ROOT/bin:$mock_bin:$PATH" \
     VK_LOADER_DRIVERS_DISABLE='*nvidia*' __EGL_VENDOR_LIBRARY_FILENAMES=mesa:nvidia \
@@ -62,6 +70,8 @@ expect "an entry that prefers the discrete GPU starts without the GPU pins" \
   "steam.desktop vk=unset egl=unset" "$(launch steam.desktop)"
 expect "a desktop id given without its suffix is found too" \
   "steam vk=unset egl=unset" "$(launch steam)"
+expect "an entry in a subdirectory is found by its desktop ID" \
+  "games-example.desktop vk=unset egl=unset" "$(launch games-example.desktop)"
 expect "an action's PrefersNonDefaultGPU is not the entry's" \
   "org.example.Editor.desktop vk=*nvidia* egl=mesa:nvidia" "$(launch org.example.Editor.desktop)"
 expect "the user's copy of an entry decides" \

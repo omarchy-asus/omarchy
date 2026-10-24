@@ -75,14 +75,14 @@ if o.shell_succeeds(o.shell_quote(nvidia)) then
     -- even one that only asks which GPUs exist. With the iGPU driving the
     -- display, any app that lists Vulkan devices or opens surfaceless EGL at
     -- startup (GTK, Chromium, Electron) woke the dGPU for about 20 seconds,
-    -- whichever GPU it went on to use. Keep NVIDIA's Vulkan driver out of the
-    -- session and try Mesa's EGL first. Apps whose desktop entry prefers the
+    -- whichever GPU it went on to use. Keep NVIDIA's Vulkan driver and EGL
+    -- vendor out of the session: GLVND asks every listed EGL vendor for its
+    -- devices, whatever their order. Apps whose desktop entry prefers the
     -- discrete GPU (Steam) start from the launcher without these, as does any
     -- command run through omarchy-launch-all-gpus, so games still find it.
     if igpu_drives_display then
-      local egl_vendors = "/usr/share/glvnd/egl_vendor.d/"
       hl.env("VK_LOADER_DRIVERS_DISABLE", "*nvidia*")
-      hl.env("__EGL_VENDOR_LIBRARY_FILENAMES", egl_vendors .. "50_mesa.json:" .. egl_vendors .. "10_nvidia.json")
+      hl.env("__EGL_VENDOR_LIBRARY_FILENAMES", "/usr/share/glvnd/egl_vendor.d/50_mesa.json")
     end
   elseif o.shell_succeeds(o.shell_quote(nvidia_without_gsp)) then
     hl.env("NVD_BACKEND", "egl")

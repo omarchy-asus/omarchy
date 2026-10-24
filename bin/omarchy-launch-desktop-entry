@@ -18,13 +18,32 @@ desktop_id=$1
 file_name=$desktop_id
 [[ $file_name == *.desktop ]] || file_name+=".desktop"
 
-# The first entry of that name on the XDG data path is the one gtk-launch runs.
+# The entry file in one applications directory. A desktop ID names an entry in
+# a subdirectory with its path's slashes turned into dashes
+# (games/example.desktop is games-example.desktop).
+entry_file() {
+  local apps=$1 file
+  if [[ -f $apps/$file_name ]]; then
+    printf '%s\n' "$apps/$file_name"
+    return
+  fi
+  [[ $file_name == *-* && -d $apps ]] || return 1
+  while IFS= read -r -d '' file; do
+    file=${file#"$apps/"}
+    if [[ ${file//\//-} == "$file_name" ]]; then
+      printf '%s\n' "$apps/$file"
+      return
+    fi
+  done < <(find "$apps" -mindepth 2 -name '*.desktop' -print0 2>/dev/null)
+  return 1
+}
+
+# The first entry of that ID on the XDG data path is the one gtk-launch runs.
 prefers_non_default_gpu() {
   local dir file
   local IFS=:
   for dir in "${XDG_DATA_HOME:-$HOME/.local/share}" ${XDG_DATA_DIRS:-/usr/local/share:/usr/share}; do
-    file="$dir/applications/$file_name"
-    [[ -f $file ]] || continue
+    file=$(entry_file "$dir/applications") || continue
     awk '
       /^\[/ { in_entry = ($0 == "[Desktop Entry]"); next }
       in_entry && /^PrefersNonDefaultGPU[[:space:]]*=[[:space:]]*true[[:space:]]*$/ { found = 1; exit }

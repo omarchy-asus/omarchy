@@ -4,8 +4,7 @@
 # omarchy:args=<command> [args...]
 
 # On a hybrid laptop whose iGPU drives the display, Hyprland keeps NVIDIA's
-# Vulkan driver out of the session and tries Mesa's EGL first
-# (default/hypr/nvidia.lua): the open driver resumes the runtime-suspended dGPU
+# Vulkan driver and EGL vendor out of the session (default/hypr/nvidia.lua): the open driver resumes the runtime-suspended dGPU
 # whenever an app merely lists GPUs. Run a game, or the launcher that starts it,
 # through this command to give it every GPU again: DXVK and other Vulkan games
 # then pick the dGPU themselves. A native OpenGL game still needs PRIME render

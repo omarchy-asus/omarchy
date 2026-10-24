@@ -61,11 +61,11 @@ Turing (first GSP)|0|0|1|0|direct nvidia nvidia - -|0x10de:0x1f91:0x030000
 Volta (last without GSP)|0|1|0|0|egl - nvidia - -|0x10de:0x1d81:0x030000
 Maxwell (first 580xx)|0|1|0|0|egl - nvidia - -|0x10de:0x1340:0x030000
 Kepler (unsupported)|0|1|1|0|- - - - -|0x10de:0x1004:0x030000
-AMD display with Ampere offload|0|0|1|1|direct - - *nvidia* 50_mesa.json:10_nvidia.json|0x1002:0x15bf:0x030000:1 0x10de:0x25ac:0x030200:0
+AMD display with Ampere offload|0|0|1|1|direct - - *nvidia* 50_mesa.json|0x1002:0x15bf:0x030000:1 0x10de:0x25ac:0x030200:0
 Intel display with Maxwell offload|0|1|0|1|egl - - - -|0x8086:0x46a6:0x030000:1 0x10de:0x1340:0x030000:0
 NVIDIA display with inactive iGPU|0|0|1|0|direct nvidia nvidia - -|0x1002:0x15bf:0x030000:0 0x10de:0x2c02:0x030000:1
 Hybrid without boot_vga|0|0|1|0|direct nvidia nvidia - -|0x1002:0x15e7:0x030000 0x10de:0x2560:0x030200
-Non-VGA AMD display with Blackwell VGA offload|0|0|1|0|direct - - *nvidia* 50_mesa.json:10_nvidia.json|0x1002:0x1114:0x038000 0x10de:0x2d59:0x030000:0
+Non-VGA AMD display with Blackwell VGA offload|0|0|1|0|direct - - *nvidia* 50_mesa.json|0x1002:0x1114:0x038000 0x10de:0x2d59:0x030000:0
 Non-VGA AMD display with Ampere 3D offload|0|0|1|0|direct nvidia nvidia - -|0x1002:0x1114:0x038000 0x10de:0x25ac:0x030200
 CASES
 
