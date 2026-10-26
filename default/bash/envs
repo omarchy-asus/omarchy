@@ -29,8 +29,9 @@ if [ -z "${LANG:-}" ]; then
 fi
 
 # On a hybrid laptop Hyprland keeps NVIDIA's Vulkan driver and EGL vendor out of
-# the desktop (default/hypr/nvidia.lua), and a terminal inherits that. What you
-# run from a shell gets every GPU again, so a game started here reaches the dGPU.
+# the desktop (default/hypr/desktop-gpu-pins.lua), and a terminal inherits that.
+# What you run from a shell gets every GPU again, so a game started here reaches
+# the dGPU.
 if [ -n "${OMARCHY_DESKTOP_GPU_PINS:-}" ]; then
   # shellcheck disable=SC2086 # a list of variable names
   unset $OMARCHY_DESKTOP_GPU_PINS

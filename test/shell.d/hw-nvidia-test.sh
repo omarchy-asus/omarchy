@@ -43,25 +43,26 @@ while IFS='|' read -r description nvidia gsp without_gsp display expected_env de
 package.path = os.getenv("ROOT") .. "/?.lua;" .. package.path
 require("default.hypr.helpers")
 local env = {}
-local handlers = {}
-hl = { env = function(key, value) env[key] = value end, on = function(event, fn) handlers[event] = fn end,
-  exec_cmd = function() end }
+hl = { env = function(key, value) env[key] = value end, on = function() end, exec_cmd = function() end,
+  dsp = { exec_cmd = function(command) return command end } }
+require("default.hypr.desktop-gpu-pins")
 require("default.hypr.nvidia")
 -- Hyprland's own environment (its renderer loads the EGL vendors from it) never
--- carries the pins; what it starts does, once it has started.
+-- carries the pins.
 if env.VK_LOADER_DRIVERS_DISABLE or env.__EGL_VENDOR_LIBRARY_FILENAMES or env.OMARCHY_DESKTOP_GPU_PINS then
   print("pins set for Hyprland itself")
 end
-require("default.hypr.autostart")
-handlers["hyprland.start"]()
-local egl = env.__EGL_VENDOR_LIBRARY_FILENAMES
-egl = egl and egl:gsub("/usr/share/glvnd/egl_vendor.d/", "")
+-- What it starts does: run a key binding's command and read its environment.
+local pipe = io.popen(hl.dsp.exec_cmd(
+  [[printf '%s|%s|%s' "${VK_LOADER_DRIVERS_DISABLE:--}" "${__EGL_VENDOR_LIBRARY_FILENAMES:--}" "${OMARCHY_DESKTOP_GPU_PINS:-}"]]))
+local vk, egl, named = pipe:read("*a"):match("^(.-)|(.-)|(.*)$")
+pipe:close()
+egl = egl:gsub("/usr/share/glvnd/egl_vendor.d/", "")
 print(table.concat({ env.NVD_BACKEND or "-", env.LIBVA_DRIVER_NAME or "-", env.__GLX_VENDOR_LIBRARY_NAME or "-",
-  env.VK_LOADER_DRIVERS_DISABLE or "-", egl or "-" }, " "))
+  vk, egl }, " "))
 -- The pins are named for bash and autostart.lua exactly when they are set.
-local named = env.OMARCHY_DESKTOP_GPU_PINS == "VK_LOADER_DRIVERS_DISABLE __EGL_VENDOR_LIBRARY_FILENAMES"
-  and o.desktop_gpu_pins ~= nil
-if named ~= (env.VK_LOADER_DRIVERS_DISABLE ~= nil) then print("pins named wrongly") end
+local pinned = named == "VK_LOADER_DRIVERS_DISABLE __EGL_VENDOR_LIBRARY_FILENAMES" and o.desktop_gpu_pins ~= nil
+if pinned ~= (vk ~= "-") then print("pins named wrongly") end
 LUA
   )
   [[ $actual_env == "$expected_env" ]] || fail "$description: driver environment" "expected $expected_env, got $actual_env"
@@ -170,15 +171,49 @@ package.path = os.getenv("ROOT") .. "/?.lua;" .. package.path
 require("default.hypr.helpers")
 local handlers, cmds = {}, {}
 hl = { env = function() end, on = function(event, fn) handlers[event] = fn end,
-  exec_cmd = function(cmd) table.insert(cmds, cmd) end }
+  exec_cmd = function(cmd) table.insert(cmds, cmd) end, dsp = { exec_cmd = function(cmd) return cmd end } }
+require("default.hypr.desktop-gpu-pins")
 require("default.hypr.nvidia")
 require("default.hypr.autostart")
 handlers["hyprland.start"]()
 for _, cmd in ipairs(cmds) do
-  if cmd:match("^dbus%-update%-activation%-environment") then print(cmd) end
+  local activation = cmd:match("dbus%-update%-activation%-environment.*")
+  if activation then print(activation) end
 end
 LUA
 )
 [[ $activation == "dbus-update-activation-environment --systemd --all && systemctl --user unset-environment VK_LOADER_DRIVERS_DISABLE __EGL_VENDOR_LIBRARY_FILENAMES" ]] ||
   fail "autostart keeps the desktop's GPU pins out of the systemd user environment" "$activation"
 pass "autostart keeps the desktop's GPU pins out of the systemd user environment"
+
+# Exec rules stay at the front of the command, where Hyprland reads them, and
+# every way Hyprland runs a command gets the pins.
+wrapped=$(lua <<'LUA'
+package.path = os.getenv("ROOT") .. "/?.lua;" .. package.path
+require("default.hypr.helpers")
+local ran, rules = {}, {}
+hl = { env = function() end, exec_cmd = function(cmd) table.insert(ran, cmd) end,
+  workspace_rule = function(rule) table.insert(rules, rule) end,
+  dsp = { exec_cmd = function(cmd) return cmd end, exec_raw = function(cmd) return cmd end } }
+require("default.hypr.desktop-gpu-pins")
+require("default.hypr.desktop-gpu-pins")
+hl.exec_cmd("app")
+local rule = { workspace = "special:scratchpad", on_created_empty = "app" }
+hl.workspace_rule(rule)
+hl.workspace_rule({ workspace = "3", gaps_in = 0 })
+print(hl.dsp.exec_cmd("[workspace 2 silent] app --flag"))
+print(hl.dsp.exec_raw("app"))
+print(ran[1])
+print(rules[1].on_created_empty)
+print(rule.on_created_empty, rules[2].on_created_empty, rules[2].gaps_in)
+LUA
+)
+expected_prefix="export VK_LOADER_DRIVERS_DISABLE='*nvidia*' __EGL_VENDOR_LIBRARY_FILENAMES='/usr/share/glvnd/egl_vendor.d/50_mesa.json' OMARCHY_DESKTOP_GPU_PINS='VK_LOADER_DRIVERS_DISABLE __EGL_VENDOR_LIBRARY_FILENAMES'; "
+expected_wrapped="[workspace 2 silent] ${expected_prefix} app --flag
+${expected_prefix}app
+${expected_prefix}app
+${expected_prefix}app
+app	nil	0"
+[[ $wrapped == "$expected_wrapped" ]] ||
+  fail "every command Hyprland runs gets the pins, exec rules first, wrapped once" "$wrapped"
+pass "every command Hyprland runs gets the pins, exec rules first, wrapped once"

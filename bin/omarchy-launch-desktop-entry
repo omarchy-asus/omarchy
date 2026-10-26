@@ -4,9 +4,9 @@
 # omarchy:args=<desktop-id>
 
 # On a hybrid laptop Hyprland keeps NVIDIA's Vulkan driver and EGL vendor out of
-# the desktop (default/hypr/nvidia.lua). A game, or a launcher that starts games,
-# starts through omarchy-launch-all-gpus instead, so it and every game it starts
-# can reach the dGPU: an entry in the Game category (Steam, Heroic, Lutris and
+# the desktop (default/hypr/desktop-gpu-pins.lua). A game, or a launcher that
+# starts games, starts through omarchy-launch-all-gpus instead, so it and every
+# game it starts can reach the dGPU: an entry in the Game category (Steam, Heroic, Lutris and
 # most games), one that prefers the discrete GPU (PrefersNonDefaultGPU=true or
 # KDE's X-KDE-RunOnDiscreteGpu=true), or one that runs a known game runner.
 # gtk-launch resolves and runs the entry either way.
