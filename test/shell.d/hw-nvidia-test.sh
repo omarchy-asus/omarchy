@@ -43,8 +43,17 @@ while IFS='|' read -r description nvidia gsp without_gsp display expected_env de
 package.path = os.getenv("ROOT") .. "/?.lua;" .. package.path
 require("default.hypr.helpers")
 local env = {}
-hl = { env = function(key, value) env[key] = value end }
+local handlers = {}
+hl = { env = function(key, value) env[key] = value end, on = function(event, fn) handlers[event] = fn end,
+  exec_cmd = function() end }
 require("default.hypr.nvidia")
+-- Hyprland's own environment (its renderer loads the EGL vendors from it) never
+-- carries the pins; what it starts does, once it has started.
+if env.VK_LOADER_DRIVERS_DISABLE or env.__EGL_VENDOR_LIBRARY_FILENAMES or env.OMARCHY_DESKTOP_GPU_PINS then
+  print("pins set for Hyprland itself")
+end
+require("default.hypr.autostart")
+handlers["hyprland.start"]()
 local egl = env.__EGL_VENDOR_LIBRARY_FILENAMES
 egl = egl and egl:gsub("/usr/share/glvnd/egl_vendor.d/", "")
 print(table.concat({ env.NVD_BACKEND or "-", env.LIBVA_DRIVER_NAME or "-", env.__GLX_VENDOR_LIBRARY_NAME or "-",
@@ -137,6 +146,22 @@ for pinned in "" "VK_LOADER_DRIVERS_DISABLE __EGL_VENDOR_LIBRARY_FILENAMES"; do
   fi
 done
 pass "the GPU pin migration asks for a reboot only while the session lacks the pins"
+
+# A session started with the pins set for Hyprland itself needs a reboot before
+# a monitor on the NVIDIA GPU's ports can appear.
+migration=$(grep -l 'Let an HDMI monitor on the NVIDIA GPU of a hybrid appear' "$ROOT"/migrations/*.sh)
+for pinned in "" "VK_LOADER_DRIVERS_DISABLE __EGL_VENDOR_LIBRARY_FILENAMES"; do
+  : >"$tmp_dir/state.log"
+  PATH="$tmp_dir/state-bin:$PATH" OMARCHY_TEST_STATE_LOG="$tmp_dir/state.log" OMARCHY_DESKTOP_GPU_PINS=$pinned \
+    bash -euo pipefail "$migration" >/dev/null
+  if [[ -n $pinned ]]; then
+    grep -Fxq "set reboot-required" "$tmp_dir/state.log" ||
+      fail "the HDMI migration asks for a reboot while Hyprland carries the old pins"
+  elif [[ -s $tmp_dir/state.log ]]; then
+    fail "the HDMI migration leaves a session without the pins alone"
+  fi
+done
+pass "the HDMI migration asks for a reboot only while Hyprland carries the old pins"
 
 # What systemd starts (a game launcher at login) gets every GPU: autostart
 # takes the desktop's pins back out of the activation environment.

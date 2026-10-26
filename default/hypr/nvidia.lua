@@ -84,11 +84,15 @@ if o.shell_succeeds(o.shell_quote(nvidia)) then
     -- drops them (default/bash/envs); the app launcher starts game entries
     -- without them (omarchy-launch-desktop-entry); and anything else can run
     -- through omarchy-launch-all-gpus. OMARCHY_DESKTOP_GPU_PINS names them.
+    -- Hyprland itself keeps NVIDIA's EGL vendor: a monitor on the dGPU's ports
+    -- (HDMI) needs it, plugged in at login or later. So autostart.lua sets the
+    -- pins once Hyprland has started, after its renderer has loaded the EGL
+    -- vendors (GLVND reads the list once per process).
     if igpu_drives_display then
-      hl.env("VK_LOADER_DRIVERS_DISABLE", "*nvidia*")
-      hl.env("__EGL_VENDOR_LIBRARY_FILENAMES", "/usr/share/glvnd/egl_vendor.d/50_mesa.json")
-      hl.env("OMARCHY_DESKTOP_GPU_PINS", "VK_LOADER_DRIVERS_DISABLE __EGL_VENDOR_LIBRARY_FILENAMES")
-      o.desktop_gpu_pins = { "VK_LOADER_DRIVERS_DISABLE", "__EGL_VENDOR_LIBRARY_FILENAMES" }
+      o.desktop_gpu_pins = {
+        { "VK_LOADER_DRIVERS_DISABLE", "*nvidia*" },
+        { "__EGL_VENDOR_LIBRARY_FILENAMES", "/usr/share/glvnd/egl_vendor.d/50_mesa.json" },
+      }
     end
   elseif o.shell_succeeds(o.shell_quote(nvidia_without_gsp)) then
     hl.env("NVD_BACKEND", "egl")

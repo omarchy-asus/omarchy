@@ -7,13 +7,24 @@ hl.on("hyprland.start", function()
     hl.env("XCURSOR_THEME", omarchy_startup_cursor.xcursor)
   end
 
+  -- The desktop's GPU pins (nvidia.lua) reach what Hyprland starts from now
+  -- on, never Hyprland's own renderer: it has already loaded its EGL vendors.
+  local pin_names = {}
+  for _, pin in ipairs(o.desktop_gpu_pins or {}) do
+    hl.env(pin[1], pin[2])
+    table.insert(pin_names, pin[1])
+  end
+  if #pin_names > 0 then
+    hl.env("OMARCHY_DESKTOP_GPU_PINS", table.concat(pin_names, " "))
+  end
+
   -- Slow app launch fix -- set systemd and D-Bus activation vars before
   -- starting session services.
-  -- The desktop's GPU pins (nvidia.lua) stay out of it, so what systemd
-  -- starts, a game launcher at login included, has every GPU.
+  -- The desktop's GPU pins stay out of it, so what systemd starts, a game
+  -- launcher at login included, has every GPU.
   local activation = "dbus-update-activation-environment --systemd --all"
-  if o.desktop_gpu_pins then
-    activation = activation .. " && systemctl --user unset-environment " .. table.concat(o.desktop_gpu_pins, " ")
+  if #pin_names > 0 then
+    activation = activation .. " && systemctl --user unset-environment " .. table.concat(pin_names, " ")
   end
   hl.exec_cmd(activation)
 
